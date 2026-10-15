@@ -193,7 +193,7 @@ body {
 #callout.bad { background: var(--red); color: #fff; box-shadow: 0 4px 0 var(--ink); }
 #callout.info { background: var(--blue); color: #fff; box-shadow: 0 4px 0 var(--ink); }
 #callout.level { background: var(--lime); box-shadow: 0 4px 0 var(--blue); }
-#callout.feed { border-left-width: 8px; border-left-color: var(--orange); text-align: left; }
+#callout.feed { text-align: left; }
 .callout-title { font-size: 0.68em; letter-spacing: 0.08em; color: #a8360f; }
 #callout.level .callout-title { color: var(--navy); }
 .callout-quote { font-size: 0.78em; font-weight: 700; }
