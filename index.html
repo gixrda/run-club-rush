@@ -14,10 +14,10 @@
         <div class="hud-row">
           <div class="stat"><span class="label">DIST</span><span class="value" id="h-dist">0.00 km</span></div>
           <div class="stat"><span class="label">TIME</span><span class="value" id="h-time">0:00</span></div>
-          <div class="stat"><span class="label">PACE</span><span class="value" id="h-pace">5:30/km</span></div>
+          <div class="stat"><span class="label"><img class="icon" data-sprite="ui/speed" alt="" hidden />PACE</span><span class="value" id="h-pace">5:30/km</span></div>
           <div class="stat"><span class="label">SCORE</span><span class="value" id="h-score">0</span></div>
           <div class="stat"><span class="label">KUDOS</span><span class="value" id="h-kudos">0</span></div>
-          <div class="stat"><span class="label">LIVES</span><span class="value lives" id="h-lives" aria-label="3 lives">♥♥♥</span></div>
+          <div class="stat"><span class="label">LIVES</span><span class="value lives" id="h-lives" role="img" aria-label="3 lives"><span class="lives-text" id="h-lives-text">♥♥♥</span><img class="life" data-sprite="ui/health" alt="" hidden /><img class="life" data-sprite="ui/health" alt="" hidden /><img class="life" data-sprite="ui/health" alt="" hidden /></span></div>
           <div class="hud-actions">
             <button class="btn btn-small" id="btn-pause" type="button">PAUSE</button>
             <button class="btn btn-small" id="btn-mute" type="button">SOUND ON</button>
@@ -25,12 +25,15 @@
         </div>
         <div class="hud-row">
           <div class="meter" id="m-stamina">
-            <span class="label">STAMINA <b id="h-stamina">100</b></span>
+            <span class="label"><img class="icon" data-sprite="ui/hydration" alt="" hidden />STAMINA <b id="h-stamina">100</b></span>
             <div class="bar"><div class="fill" id="f-stamina"></div></div>
           </div>
-          <div class="meter" id="m-brainrot">
-            <span class="label">BRAINROT LV <b id="h-level">1</b>/5 · <b id="h-title">CASUAL RUNNER</b></span>
-            <div class="bar"><div class="fill" id="f-brainrot"></div></div>
+          <div class="meter meter-brainrot" id="m-brainrot">
+            <img class="portrait" id="h-variant" data-sprite="runner/lv1" alt="" hidden />
+            <div class="meter-body">
+              <span class="label"><img class="icon" data-sprite="ui/brainrot" alt="" hidden />BRAINROT LV <b id="h-level">1</b>/5 · <b id="h-title">CASUAL RUNNER</b></span>
+              <div class="bar"><div class="fill" id="f-brainrot"></div></div>
+            </div>
           </div>
           <div class="stat stat-pb"><span class="label">PB</span><span class="value" id="h-pb">0</span></div>
         </div>
@@ -39,11 +42,11 @@
       <div id="play">
         <button class="pad" id="pad-jump" type="button" aria-label="Jump">JUMP</button>
         <div id="stage">
-          <canvas id="game" width="480" height="270" aria-label="Strava Brainrot game area"></canvas>
+          <canvas id="game" width="960" height="540" aria-label="Strava Brainrot game area"></canvas>
           <div id="tags" class="hud-tags">
             <span class="tag" id="t-combo" hidden></span>
             <span class="tag" id="t-mult" hidden></span>
-            <span class="tag" id="t-boost" hidden>SUGAR RUSH</span>
+            <span class="tag" id="t-boost" hidden><img class="icon" data-sprite="ui/energy" alt="" hidden />SUGAR RUSH</span>
             <span class="tag tag-bad" id="t-bonk" hidden>BONKED · SLOWER</span>
           </div>
           <div id="feed" aria-live="polite"></div>
@@ -55,7 +58,10 @@
 
     <section class="screen" id="screen-title" aria-labelledby="logo">
       <div class="panel panel-title">
-        <h1 id="logo" class="logo"><span class="logo-a">STRAVA</span><span class="logo-b">BRAINROT</span></h1>
+        <div class="title-hero">
+          <img class="hero-runner" data-sprite="runner/idle" alt="" hidden />
+          <h1 id="logo" class="logo"><span class="logo-a">STRAVA</span><span class="logo-b">BRAINROT</span></h1>
+        </div>
         <p class="subtitle">A running game for people who need help.</p>
         <button class="btn btn-primary btn-big" id="btn-play" type="button">PLAY</button>
         <p class="records">BEST SCORE <b id="r-score">0</b> · LONGEST RUN <b id="r-dist">0.00 km</b></p>
@@ -95,7 +101,7 @@
             <div><dt>AVG PACE</dt><dd id="o-pace">-</dd></div>
             <div><dt>KUDOS</dt><dd id="o-kudos">0</dd></div>
             <div><dt>SHOES</dt><dd id="o-shoes">0</dd></div>
-            <div class="wide"><dt>PEAK BRAINROT</dt><dd id="o-level">LV 1 · CASUAL RUNNER</dd></div>
+            <div class="wide peak"><img class="portrait" id="o-variant" data-sprite="runner/lv1" alt="" hidden /><div><dt>PEAK BRAINROT</dt><dd id="o-level">LV 1 · CASUAL RUNNER</dd></div></div>
             <div class="wide"><dt>BEST SCORE</dt><dd id="o-best">0</dd></div>
           </dl>
         </div>

@@ -17,6 +17,32 @@ function set(id, value, prop = 'textContent') {
   else $(id)[prop] = value;
 }
 
+// Native-resolution sprite files from the sheet, keyed like 'ui/health' (empty until loaded).
+let spriteFiles = {};
+
+// Fill every <img data-sprite="..."> with its sheet sprite. Missing ones stay hidden;
+// every icon sits next to a text label, so nothing essential is lost.
+export function applySprites(files) {
+  spriteFiles = files;
+  for (const img of document.querySelectorAll('img[data-sprite]')) {
+    const src = files[img.dataset.sprite];
+    if (src) {
+      img.src = src;
+      img.hidden = false;
+    }
+  }
+  $('h-lives').classList.toggle('has-sprites', Boolean(files['ui/health']));
+}
+
+function variantImg(key, cls) {
+  if (!spriteFiles[key]) return null;
+  const img = document.createElement('img');
+  img.className = cls;
+  img.src = spriteFiles[key];
+  img.alt = '';
+  return img;
+}
+
 const screens = ['title', 'pause', 'over'];
 export let currentScreen = 'title';
 
@@ -44,8 +70,12 @@ export function updateHUD(game, records) {
   set('h-pace', game.boostT > 0 ? 'ILLEGAL' : `${formatPace(game.pace)}/km`);
   set('h-score', fmtInt(game.score));
   set('h-kudos', String(game.kudos));
-  set('h-lives', '♥'.repeat(game.lives) + '♡'.repeat(3 - game.lives));
-  set('h-lives', `${game.lives} lives`, 'ariaLabel');
+  set('h-lives-text', '♥'.repeat(game.lives) + '♡'.repeat(3 - game.lives));
+  set('h-lives', `${game.lives} of 3 lives`, 'ariaLabel');
+  if (cache.get('lives-icons') !== game.lives) {
+    cache.set('lives-icons', game.lives);
+    document.querySelectorAll('#h-lives .life').forEach((img, i) => img.classList.toggle('lost', i >= game.lives));
+  }
 
   const st = Math.ceil(game.stamina);
   set('h-stamina', String(st));
@@ -55,6 +85,7 @@ export function updateHUD(game, records) {
   const lv = game.levelInfo;
   set('h-level', String(game.level));
   set('h-title', lv.title);
+  if (spriteFiles[lv.variant]) set('h-variant', spriteFiles[lv.variant], 'src');
   set('f-brainrot', `${game.brainrot}%`, 'width');
 
   const beating = game.score > records.bestScore && records.bestScore > 0;
@@ -80,10 +111,12 @@ export function callout(textOrNode, kind = 'good', ms = 1800) {
   calloutTimer = setTimeout(() => { el.className = ''; }, ms);
 }
 
-export function levelUp({ level, title, quote }) {
+export function levelUp({ level, title, rank, variant, quote }) {
   const frag = document.createDocumentFragment();
+  const img = variantImg(variant, 'callout-variant');
+  if (img) frag.append(img);
   const t = document.createElement('strong');
-  t.textContent = `LV ${level}: ${title}`;
+  t.textContent = `LV ${level} ${rank}: ${title}`;
   const q = document.createElement('span');
   q.textContent = `"${quote}"`;
   frag.append(t, q);
@@ -121,7 +154,8 @@ export function showResults(result, records, isPB, message) {
   $('o-pace').textContent = result.meters > 50 ? `${formatPace(result.pace)}/km` : '-';
   $('o-kudos').textContent = String(result.kudos);
   $('o-shoes').textContent = String(result.shoes);
-  $('o-level').textContent = `LV ${result.maxLevel} · ${result.maxLevelTitle}`;
+  $('o-level').textContent = `LV ${result.maxLevel} ${result.maxLevelRank} · ${result.maxLevelTitle}`;
+  if (spriteFiles[result.maxLevelVariant]) $('o-variant').src = spriteFiles[result.maxLevelVariant];
   $('o-best').textContent = fmtInt(records.bestScore);
   showScreen('over');
 }

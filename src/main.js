@@ -1,6 +1,7 @@
 import './styles.css';
 import { Game } from './game.js';
 import { createRenderer } from './render.js';
+import { loadSprites } from './sprites.js';
 import { initAudio, setMuted as setAudioMuted, sfx } from './audio.js';
 import * as ui from './ui.js';
 import { DNF_MESSAGES, FINISH_MESSAGES } from './config.js';
@@ -28,8 +29,8 @@ function save() {
 const store = load();
 
 // ---------- game wiring ----------
-let state = 'title'; // title | playing | paused | over
-const renderer = createRenderer($('game'));
+let state = 'loading'; // loading | title | playing | paused | over
+let renderer = null; // created once the sprite sheet assets are loaded
 const game = new Game(onEvent, reducedMotion);
 if (import.meta.env.DEV) window.__game = game; // debugging / smoke tests only
 
@@ -60,6 +61,7 @@ function gameOver(result) {
 }
 
 function start() {
+  if (state === 'loading') return;
   initAudio();
   game.reset();
   ui.clearTransient();
@@ -209,8 +211,10 @@ function frame(now) {
   // Clamp dt so a stalled tab can't fast-forward the run.
   const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
   last = now;
-  if (state === 'playing' || state === 'title') game.update(dt);
-  renderer.draw(game);
+  if (renderer) {
+    if (state === 'playing' || state === 'title') game.update(dt);
+    renderer.draw(game);
+  }
   if (state === 'playing') ui.updateHUD(game, store);
   requestAnimationFrame(frame);
 }
@@ -226,3 +230,18 @@ ui.setMuted(store.muted);
 ui.setRecords(store);
 ui.showScreen('title');
 requestAnimationFrame(frame);
+
+// Preload every sheet sprite before the first run; failures fall back to procedural art.
+const playBtn = $('btn-play');
+playBtn.disabled = true;
+playBtn.textContent = 'LOADING';
+loadSprites((done, total) => {
+  playBtn.textContent = `LOADING ${done}/${total}`;
+}).then((atlas) => {
+  renderer = createRenderer($('game'), atlas);
+  ui.applySprites(atlas.files);
+  state = 'title';
+  playBtn.disabled = false;
+  playBtn.textContent = 'PLAY';
+  playBtn.focus({ preventScroll: true });
+});

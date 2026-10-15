@@ -1,0 +1,1130 @@
+{
+ "source": "sprite-sheet-reference.png.png",
+ "sheetSize": [
+  1536,
+  1024
+ ],
+ "gameScale": 2,
+ "sprites": {
+  "runner/idle": {
+   "file": "runner/idle.png",
+   "gameFile": "runner/game/idle.png",
+   "source": {
+    "x": 31,
+    "y": 72,
+    "w": 66,
+    "h": 189
+   },
+   "game": {
+    "w": 30,
+    "h": 87
+   },
+   "anchorX": 0.542,
+   "use": "title screen idle pose"
+  },
+  "runner/run1": {
+   "file": "runner/run1.png",
+   "gameFile": "runner/game/run1.png",
+   "source": {
+    "x": 119,
+    "y": 75,
+    "w": 101,
+    "h": 187
+   },
+   "game": {
+    "w": 46,
+    "h": 86
+   },
+   "anchorX": 0.603,
+   "use": "run cycle frame 1"
+  },
+  "runner/run2": {
+   "file": "runner/run2.png",
+   "gameFile": "runner/game/run2.png",
+   "source": {
+    "x": 229,
+    "y": 74,
+    "w": 104,
+    "h": 186
+   },
+   "game": {
+    "w": 48,
+    "h": 86
+   },
+   "anchorX": 0.6,
+   "use": "run cycle frame 2"
+  },
+  "runner/run3": {
+   "file": "runner/run3.png",
+   "gameFile": "runner/game/run3.png",
+   "source": {
+    "x": 346,
+    "y": 74,
+    "w": 109,
+    "h": 187
+   },
+   "game": {
+    "w": 50,
+    "h": 86
+   },
+   "anchorX": 0.536,
+   "use": "run cycle frame 3"
+  },
+  "runner/run4": {
+   "file": "runner/run4.png",
+   "gameFile": "runner/game/run4.png",
+   "source": {
+    "x": 467,
+    "y": 75,
+    "w": 117,
+    "h": 184
+   },
+   "game": {
+    "w": 54,
+    "h": 85
+   },
+   "anchorX": 0.558,
+   "use": "run cycle frame 4"
+  },
+  "runner/jump": {
+   "file": "runner/jump.png",
+   "gameFile": "runner/game/jump.png",
+   "source": {
+    "x": 607,
+    "y": 58,
+    "w": 102,
+    "h": 173
+   },
+   "game": {
+    "w": 47,
+    "h": 80
+   },
+   "anchorX": 0.601,
+   "use": "airborne"
+  },
+  "runner/slide": {
+   "file": "runner/slide.png",
+   "gameFile": "runner/game/slide.png",
+   "source": {
+    "x": 681,
+    "y": 141,
+    "w": 124,
+    "h": 121
+   },
+   "game": {
+    "w": 57,
+    "h": 56
+   },
+   "anchorX": 0.776,
+   "use": "sliding"
+  },
+  "runner/hit": {
+   "file": "runner/hit.png",
+   "gameFile": "runner/game/hit.png",
+   "source": {
+    "x": 834,
+    "y": 117,
+    "w": 104,
+    "h": 144
+   },
+   "game": {
+    "w": 48,
+    "h": 66
+   },
+   "anchorX": 0.634,
+   "use": "collision feedback"
+  },
+  "runner/lv1": {
+   "file": "runner/lv1.png",
+   "gameFile": "runner/game/lv1.png",
+   "source": {
+    "x": 1005,
+    "y": 76,
+    "w": 63,
+    "h": 192
+   },
+   "game": {
+    "w": 29,
+    "h": 88
+   },
+   "anchorX": 0.505,
+   "use": "progression LV1 Beginner"
+  },
+  "runner/lv2": {
+   "file": "runner/lv2.png",
+   "gameFile": "runner/game/lv2.png",
+   "source": {
+    "x": 1106,
+    "y": 80,
+    "w": 68,
+    "h": 182
+   },
+   "game": {
+    "w": 31,
+    "h": 84
+   },
+   "anchorX": 0.513,
+   "use": "progression LV2 Amateur"
+  },
+  "runner/lv3": {
+   "file": "runner/lv3.png",
+   "gameFile": "runner/game/lv3.png",
+   "source": {
+    "x": 1207,
+    "y": 74,
+    "w": 66,
+    "h": 189
+   },
+   "game": {
+    "w": 30,
+    "h": 87
+   },
+   "anchorX": 0.542,
+   "use": "progression LV3 Dedicated"
+  },
+  "runner/lv4": {
+   "file": "runner/lv4.png",
+   "gameFile": "runner/game/lv4.png",
+   "source": {
+    "x": 1307,
+    "y": 76,
+    "w": 73,
+    "h": 192
+   },
+   "game": {
+    "w": 34,
+    "h": 88
+   },
+   "anchorX": 0.569,
+   "use": "progression LV4 Hybrid"
+  },
+  "runner/lv5": {
+   "file": "runner/lv5.png",
+   "gameFile": "runner/game/lv5.png",
+   "source": {
+    "x": 1409,
+    "y": 76,
+    "w": 108,
+    "h": 188
+   },
+   "game": {
+    "w": 50,
+    "h": 86
+   },
+   "anchorX": 0.485,
+   "use": "progression LV5 Legend"
+  },
+  "shoes/daily": {
+   "file": "shoes/daily.png",
+   "gameFile": "shoes/game/daily.png",
+   "source": {
+    "x": 31,
+    "y": 379,
+    "w": 90,
+    "h": 58
+   },
+   "game": {
+    "w": 38,
+    "h": 24
+   },
+   "anchorX": 0.5,
+   "use": "shoes pickup"
+  },
+  "shoes/tempo": {
+   "file": "shoes/tempo.png",
+   "gameFile": "shoes/game/tempo.png",
+   "source": {
+    "x": 144,
+    "y": 379,
+    "w": 84,
+    "h": 56
+   },
+   "game": {
+    "w": 38,
+    "h": 25
+   },
+   "anchorX": 0.5,
+   "use": "shoes pickup"
+  },
+  "shoes/race": {
+   "file": "shoes/race.png",
+   "gameFile": "shoes/game/race.png",
+   "source": {
+    "x": 248,
+    "y": 380,
+    "w": 85,
+    "h": 55
+   },
+   "game": {
+    "w": 38,
+    "h": 25
+   },
+   "anchorX": 0.5,
+   "use": "shoes pickup"
+  },
+  "shoes/trail": {
+   "file": "shoes/trail.png",
+   "gameFile": "shoes/game/trail.png",
+   "source": {
+    "x": 353,
+    "y": 379,
+    "w": 89,
+    "h": 57
+   },
+   "game": {
+    "w": 38,
+    "h": 24
+   },
+   "anchorX": 0.5,
+   "use": "shoes pickup"
+  },
+  "shoes/super": {
+   "file": "shoes/super.png",
+   "gameFile": "shoes/game/super.png",
+   "source": {
+    "x": 466,
+    "y": 379,
+    "w": 93,
+    "h": 57
+   },
+   "game": {
+    "w": 38,
+    "h": 23
+   },
+   "anchorX": 0.5,
+   "use": "shoes pickup"
+  },
+  "nutrition/gel": {
+   "file": "nutrition/gel.png",
+   "gameFile": "nutrition/game/gel.png",
+   "source": {
+    "x": 624,
+    "y": 358,
+    "w": 40,
+    "h": 91
+   },
+   "game": {
+    "w": 15,
+    "h": 34
+   },
+   "anchorX": 0.5,
+   "use": "gel pickup"
+  },
+  "nutrition/bar": {
+   "file": "nutrition/bar.png",
+   "gameFile": "nutrition/game/bar.png",
+   "source": {
+    "x": 721,
+    "y": 357,
+    "w": 39,
+    "h": 93
+   },
+   "game": {
+    "w": 14,
+    "h": 34
+   },
+   "anchorX": 0.5,
+   "use": "gel pickup variant"
+  },
+  "nutrition/iso": {
+   "file": "nutrition/iso.png",
+   "gameFile": "nutrition/game/iso.png",
+   "source": {
+    "x": 818,
+    "y": 359,
+    "w": 40,
+    "h": 89
+   },
+   "game": {
+    "w": 15,
+    "h": 34
+   },
+   "anchorX": 0.5,
+   "use": "hydration pickup variant"
+  },
+  "nutrition/caffeine": {
+   "file": "nutrition/caffeine.png",
+   "gameFile": "nutrition/game/caffeine.png",
+   "source": {
+    "x": 916,
+    "y": 364,
+    "w": 43,
+    "h": 92
+   },
+   "game": {
+    "w": 16,
+    "h": 34
+   },
+   "anchorX": 0.5,
+   "use": "gel pickup variant"
+  },
+  "nutrition/salts": {
+   "file": "nutrition/salts.png",
+   "gameFile": "nutrition/game/salts.png",
+   "source": {
+    "x": 1014,
+    "y": 365,
+    "w": 35,
+    "h": 81
+   },
+   "game": {
+    "w": 15,
+    "h": 34
+   },
+   "anchorX": 0.5,
+   "use": "hydration pickup variant"
+  },
+  "hydration/softflask": {
+   "file": "hydration/softflask.png",
+   "gameFile": "hydration/game/softflask.png",
+   "source": {
+    "x": 1142,
+    "y": 359,
+    "w": 34,
+    "h": 89
+   },
+   "game": {
+    "w": 13,
+    "h": 34
+   },
+   "anchorX": 0.5,
+   "use": "water pickup"
+  },
+  "hydration/bottle": {
+   "file": "hydration/bottle.png",
+   "gameFile": "hydration/game/bottle.png",
+   "source": {
+    "x": 1248,
+    "y": 361,
+    "w": 32,
+    "h": 87
+   },
+   "game": {
+    "w": 13,
+    "h": 34
+   },
+   "anchorX": 0.5,
+   "use": "water pickup"
+  },
+  "hydration/thermos": {
+   "file": "hydration/thermos.png",
+   "gameFile": "hydration/game/thermos.png",
+   "source": {
+    "x": 1347,
+    "y": 357,
+    "w": 40,
+    "h": 99
+   },
+   "game": {
+    "w": 14,
+    "h": 34
+   },
+   "anchorX": 0.5,
+   "use": "water pickup"
+  },
+  "hydration/cup": {
+   "file": "hydration/cup.png",
+   "gameFile": "hydration/game/cup.png",
+   "source": {
+    "x": 1445,
+    "y": 370,
+    "w": 45,
+    "h": 70
+   },
+   "game": {
+    "w": 22,
+    "h": 34
+   },
+   "anchorX": 0.5,
+   "use": "water pickup"
+  },
+  "equipment/vest": {
+   "file": "equipment/vest.png",
+   "gameFile": "equipment/game/vest.png",
+   "source": {
+    "x": 44,
+    "y": 557,
+    "w": 72,
+    "h": 87
+   },
+   "game": {
+    "w": 28,
+    "h": 34
+   },
+   "anchorX": 0.5,
+   "use": "catalogue only"
+  },
+  "equipment/cap": {
+   "file": "equipment/cap.png",
+   "gameFile": "equipment/game/cap.png",
+   "source": {
+    "x": 147,
+    "y": 570,
+    "w": 80,
+    "h": 48
+   },
+   "game": {
+    "w": 34,
+    "h": 20
+   },
+   "anchorX": 0.5,
+   "use": "catalogue only"
+  },
+  "equipment/sunglasses": {
+   "file": "equipment/sunglasses.png",
+   "gameFile": "equipment/game/sunglasses.png",
+   "source": {
+    "x": 253,
+    "y": 576,
+    "w": 74,
+    "h": 38
+   },
+   "game": {
+    "w": 34,
+    "h": 17
+   },
+   "anchorX": 0.5,
+   "use": "catalogue only"
+  },
+  "equipment/headlamp": {
+   "file": "equipment/headlamp.png",
+   "gameFile": "equipment/game/headlamp.png",
+   "source": {
+    "x": 346,
+    "y": 578,
+    "w": 74,
+    "h": 41
+   },
+   "game": {
+    "w": 34,
+    "h": 19
+   },
+   "anchorX": 0.5,
+   "use": "catalogue only"
+  },
+  "equipment/gpswatch": {
+   "file": "equipment/gpswatch.png",
+   "gameFile": "equipment/game/gpswatch.png",
+   "source": {
+    "x": 448,
+    "y": 556,
+    "w": 52,
+    "h": 88
+   },
+   "game": {
+    "w": 20,
+    "h": 34
+   },
+   "anchorX": 0.5,
+   "use": "catalogue only"
+  },
+  "equipment/sleeves": {
+   "file": "equipment/sleeves.png",
+   "gameFile": "equipment/game/sleeves.png",
+   "source": {
+    "x": 544,
+    "y": 554,
+    "w": 61,
+    "h": 90
+   },
+   "game": {
+    "w": 23,
+    "h": 34
+   },
+   "anchorX": 0.5,
+   "use": "catalogue only"
+  },
+  "equipment/belt": {
+   "file": "equipment/belt.png",
+   "gameFile": "equipment/game/belt.png",
+   "source": {
+    "x": 626,
+    "y": 565,
+    "w": 101,
+    "h": 56
+   },
+   "game": {
+    "w": 34,
+    "h": 19
+   },
+   "anchorX": 0.5,
+   "use": "catalogue only"
+  },
+  "equipment/poles": {
+   "file": "equipment/poles.png",
+   "gameFile": "equipment/game/poles.png",
+   "source": {
+    "x": 756,
+    "y": 536,
+    "w": 59,
+    "h": 98
+   },
+   "game": {
+    "w": 20,
+    "h": 34
+   },
+   "anchorX": 0.5,
+   "use": "catalogue only"
+  },
+  "bibs/5k": {
+   "file": "bibs/5k.png",
+   "gameFile": "bibs/game/5k.png",
+   "source": {
+    "x": 910,
+    "y": 560,
+    "w": 90,
+    "h": 77
+   },
+   "game": {
+    "w": 36,
+    "h": 31
+   },
+   "anchorX": 0.5,
+   "use": "race bib pickup"
+  },
+  "bibs/10k": {
+   "file": "bibs/10k.png",
+   "gameFile": "bibs/game/10k.png",
+   "source": {
+    "x": 1031,
+    "y": 560,
+    "w": 88,
+    "h": 74
+   },
+   "game": {
+    "w": 36,
+    "h": 30
+   },
+   "anchorX": 0.5,
+   "use": "race bib pickup"
+  },
+  "bibs/21k": {
+   "file": "bibs/21k.png",
+   "gameFile": "bibs/game/21k.png",
+   "source": {
+    "x": 1153,
+    "y": 559,
+    "w": 89,
+    "h": 76
+   },
+   "game": {
+    "w": 36,
+    "h": 31
+   },
+   "anchorX": 0.5,
+   "use": "race bib pickup"
+  },
+  "bibs/42k": {
+   "file": "bibs/42k.png",
+   "gameFile": "bibs/game/42k.png",
+   "source": {
+    "x": 1279,
+    "y": 554,
+    "w": 89,
+    "h": 77
+   },
+   "game": {
+    "w": 36,
+    "h": 31
+   },
+   "anchorX": 0.5,
+   "use": "race bib pickup"
+  },
+  "bibs/ultra": {
+   "file": "bibs/ultra.png",
+   "gameFile": "bibs/game/ultra.png",
+   "source": {
+    "x": 1406,
+    "y": 545,
+    "w": 88,
+    "h": 93
+   },
+   "game": {
+    "w": 34,
+    "h": 36
+   },
+   "anchorX": 0.5,
+   "use": "race bib pickup"
+  },
+  "collectibles/coin": {
+   "file": "collectibles/coin.png",
+   "gameFile": "collectibles/game/coin.png",
+   "source": {
+    "x": 45,
+    "y": 737,
+    "w": 55,
+    "h": 58
+   },
+   "game": {
+    "w": 27,
+    "h": 28
+   },
+   "anchorX": 0.5,
+   "use": "kudos pickup"
+  },
+  "collectibles/exp": {
+   "file": "collectibles/exp.png",
+   "gameFile": "collectibles/game/exp.png",
+   "source": {
+    "x": 144,
+    "y": 738,
+    "w": 48,
+    "h": 53
+   },
+   "game": {
+    "w": 29,
+    "h": 32
+   },
+   "anchorX": 0.5,
+   "use": "EXP pickup"
+  },
+  "collectibles/health": {
+   "file": "collectibles/health.png",
+   "gameFile": "collectibles/game/health.png",
+   "source": {
+    "x": 231,
+    "y": 744,
+    "w": 49,
+    "h": 46
+   },
+   "game": {
+    "w": 32,
+    "h": 30
+   },
+   "anchorX": 0.5,
+   "use": "extra life pickup"
+  },
+  "collectibles/boost": {
+   "file": "collectibles/boost.png",
+   "gameFile": "collectibles/game/boost.png",
+   "source": {
+    "x": 313,
+    "y": 740,
+    "w": 67,
+    "h": 52
+   },
+   "game": {
+    "w": 36,
+    "h": 28
+   },
+   "anchorX": 0.5,
+   "use": "boost pickup"
+  },
+  "collectibles/speed": {
+   "file": "collectibles/speed.png",
+   "gameFile": "collectibles/game/speed.png",
+   "source": {
+    "x": 412,
+    "y": 737,
+    "w": 51,
+    "h": 51
+   },
+   "game": {
+    "w": 34,
+    "h": 34
+   },
+   "anchorX": 0.5,
+   "use": "boost pickup variant"
+  },
+  "collectibles/strength": {
+   "file": "collectibles/strength.png",
+   "gameFile": "collectibles/game/strength.png",
+   "source": {
+    "x": 505,
+    "y": 733,
+    "w": 55,
+    "h": 58
+   },
+   "game": {
+    "w": 32,
+    "h": 34
+   },
+   "anchorX": 0.5,
+   "use": "HYROX token"
+  },
+  "collectibles/brainrot": {
+   "file": "collectibles/brainrot.png",
+   "gameFile": "collectibles/game/brainrot.png",
+   "source": {
+    "x": 599,
+    "y": 736,
+    "w": 65,
+    "h": 57
+   },
+   "game": {
+    "w": 34,
+    "h": 30
+   },
+   "anchorX": 0.5,
+   "use": "brainrot pickup"
+  },
+  "collectibles/streak": {
+   "file": "collectibles/streak.png",
+   "gameFile": "collectibles/game/streak.png",
+   "source": {
+    "x": 714,
+    "y": 741,
+    "w": 45,
+    "h": 51
+   },
+   "game": {
+    "w": 28,
+    "h": 32
+   },
+   "anchorX": 0.5,
+   "use": "streak pickup"
+  },
+  "medals/5k": {
+   "file": "medals/5k.png",
+   "gameFile": "medals/game/5k.png",
+   "source": {
+    "x": 847,
+    "y": 720,
+    "w": 64,
+    "h": 98
+   },
+   "game": {
+    "w": 24,
+    "h": 36
+   },
+   "anchorX": 0.5,
+   "use": "medal pickup"
+  },
+  "medals/10k": {
+   "file": "medals/10k.png",
+   "gameFile": "medals/game/10k.png",
+   "source": {
+    "x": 943,
+    "y": 721,
+    "w": 64,
+    "h": 97
+   },
+   "game": {
+    "w": 24,
+    "h": 36
+   },
+   "anchorX": 0.5,
+   "use": "medal pickup"
+  },
+  "medals/21k": {
+   "file": "medals/21k.png",
+   "gameFile": "medals/game/21k.png",
+   "source": {
+    "x": 1038,
+    "y": 722,
+    "w": 65,
+    "h": 95
+   },
+   "game": {
+    "w": 25,
+    "h": 36
+   },
+   "anchorX": 0.5,
+   "use": "medal pickup"
+  },
+  "medals/42k": {
+   "file": "medals/42k.png",
+   "gameFile": "medals/game/42k.png",
+   "source": {
+    "x": 1132,
+    "y": 720,
+    "w": 67,
+    "h": 96
+   },
+   "game": {
+    "w": 25,
+    "h": 36
+   },
+   "anchorX": 0.5,
+   "use": "medal pickup"
+  },
+  "medals/ultra": {
+   "file": "medals/ultra.png",
+   "gameFile": "medals/game/ultra.png",
+   "source": {
+    "x": 1231,
+    "y": 721,
+    "w": 66,
+    "h": 94
+   },
+   "game": {
+    "w": 25,
+    "h": 36
+   },
+   "anchorX": 0.5,
+   "use": "medal pickup"
+  },
+  "medals/hyrox": {
+   "file": "medals/hyrox.png",
+   "gameFile": "medals/game/hyrox.png",
+   "source": {
+    "x": 1327,
+    "y": 720,
+    "w": 64,
+    "h": 96
+   },
+   "game": {
+    "w": 24,
+    "h": 36
+   },
+   "anchorX": 0.5,
+   "use": "medal pickup"
+  },
+  "medals/finisher": {
+   "file": "medals/finisher.png",
+   "gameFile": "medals/game/finisher.png",
+   "source": {
+    "x": 1422,
+    "y": 721,
+    "w": 67,
+    "h": 89
+   },
+   "game": {
+    "w": 27,
+    "h": 36
+   },
+   "anchorX": 0.5,
+   "use": "medal pickup / finish"
+  },
+  "obstacles/dog": {
+   "file": "obstacles/dog.png",
+   "gameFile": "obstacles/game/dog.png",
+   "source": {
+    "x": 32,
+    "y": 903,
+    "w": 86,
+    "h": 66
+   },
+   "game": {
+    "w": 65,
+    "h": 50
+   },
+   "anchorX": 0.5,
+   "use": "ground enemy, jump"
+  },
+  "obstacles/pigeon": {
+   "file": "obstacles/pigeon.png",
+   "gameFile": "obstacles/game/pigeon.png",
+   "source": {
+    "x": 145,
+    "y": 906,
+    "w": 52,
+    "h": 60
+   },
+   "game": {
+    "w": 33,
+    "h": 38
+   },
+   "anchorX": 0.5,
+   "use": "flying enemy, slide"
+  },
+  "obstacles/bee": {
+   "file": "obstacles/bee.png",
+   "gameFile": "obstacles/game/bee.png",
+   "source": {
+    "x": 235,
+    "y": 899,
+    "w": 69,
+    "h": 63
+   },
+   "game": {
+    "w": 39,
+    "h": 36
+   },
+   "anchorX": 0.5,
+   "use": "flying enemy, slide"
+  },
+  "obstacles/poop": {
+   "file": "obstacles/poop.png",
+   "gameFile": "obstacles/game/poop.png",
+   "source": {
+    "x": 335,
+    "y": 909,
+    "w": 56,
+    "h": 53
+   },
+   "game": {
+    "w": 30,
+    "h": 28
+   },
+   "anchorX": 0.5,
+   "use": "ground hazard, jump"
+  },
+  "obstacles/cone": {
+   "file": "obstacles/cone.png",
+   "gameFile": "obstacles/game/cone.png",
+   "source": {
+    "x": 429,
+    "y": 891,
+    "w": 54,
+    "h": 71
+   },
+   "game": {
+    "w": 40,
+    "h": 52
+   },
+   "anchorX": 0.5,
+   "use": "ground hazard, jump"
+  },
+  "obstacles/barrier": {
+   "file": "obstacles/barrier.png",
+   "gameFile": "obstacles/game/barrier.png",
+   "source": {
+    "x": 512,
+    "y": 910,
+    "w": 82,
+    "h": 52
+   },
+   "game": {
+    "w": 82,
+    "h": 52
+   },
+   "anchorX": 0.5,
+   "use": "ground hazard, jump"
+  },
+  "obstacles/puddle": {
+   "file": "obstacles/puddle.png",
+   "gameFile": "obstacles/game/puddle.png",
+   "source": {
+    "x": 626,
+    "y": 925,
+    "w": 93,
+    "h": 37
+   },
+   "game": {
+    "w": 92,
+    "h": 37
+   },
+   "anchorX": 0.5,
+   "use": "ground hazard, jump"
+  },
+  "obstacles/stairs": {
+   "file": "obstacles/stairs.png",
+   "gameFile": "obstacles/game/stairs.png",
+   "source": {
+    "x": 747,
+    "y": 911,
+    "w": 80,
+    "h": 52
+   },
+   "game": {
+    "w": 86,
+    "h": 56
+   },
+   "anchorX": 0.5,
+   "use": "ground hazard, jump"
+  },
+  "obstacles/brainwall": {
+   "file": "obstacles/brainwall.png",
+   "gameFile": "obstacles/game/brainwall.png",
+   "source": {
+    "x": 864,
+    "y": 898,
+    "w": 50,
+    "h": 53
+   },
+   "game": {
+    "w": 49,
+    "h": 52
+   },
+   "anchorX": 0.5,
+   "use": "ground hazard (late game), jump"
+  },
+  "obstacles/notification": {
+   "file": "obstacles/notification.png",
+   "gameFile": "obstacles/game/notification.png",
+   "source": {
+    "x": 963,
+    "y": 881,
+    "w": 48,
+    "h": 79
+   },
+   "game": {
+    "w": 29,
+    "h": 48
+   },
+   "anchorX": 0.5,
+   "use": "floating enemy, slide"
+  },
+  "ui/health": {
+   "file": "ui/health.png",
+   "gameFile": "ui/game/health.png",
+   "source": {
+    "x": 1088,
+    "y": 913,
+    "w": 47,
+    "h": 43
+   },
+   "game": {
+    "w": 32,
+    "h": 29
+   },
+   "anchorX": 0.5,
+   "use": "HUD lives"
+  },
+  "ui/energy": {
+   "file": "ui/energy.png",
+   "gameFile": "ui/game/energy.png",
+   "source": {
+    "x": 1183,
+    "y": 911,
+    "w": 31,
+    "h": 47
+   },
+   "game": {
+    "w": 21,
+    "h": 32
+   },
+   "anchorX": 0.5,
+   "use": "HUD boost"
+  },
+  "ui/speed": {
+   "file": "ui/speed.png",
+   "gameFile": "ui/game/speed.png",
+   "source": {
+    "x": 1249,
+    "y": 911,
+    "w": 56,
+    "h": 47
+   },
+   "game": {
+    "w": 32,
+    "h": 27
+   },
+   "anchorX": 0.5,
+   "use": "HUD pace"
+  },
+  "ui/hydration": {
+   "file": "ui/hydration.png",
+   "gameFile": "ui/game/hydration.png",
+   "source": {
+    "x": 1358,
+    "y": 911,
+    "w": 34,
+    "h": 47
+   },
+   "game": {
+    "w": 23,
+    "h": 32
+   },
+   "anchorX": 0.5,
+   "use": "HUD stamina"
+  },
+  "ui/brainrot": {
+   "file": "ui/brainrot.png",
+   "gameFile": "ui/game/brainrot.png",
+   "source": {
+    "x": 1450,
+    "y": 910,
+    "w": 55,
+    "h": 48
+   },
+   "game": {
+    "w": 32,
+    "h": 28
+   },
+   "anchorX": 0.5,
+   "use": "HUD brainrot"
+  }
+ }
+}

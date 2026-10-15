@@ -1,4 +1,8 @@
-import { W, H, GROUND_Y, PLAYER_X, METERS_PER_PX, FINISH_M, COLORS as C } from './config.js';
+import { W, H, GROUND_Y, PLAYER_X, METERS_PER_PX, FINISH_M, COLORS as C, OBSTACLES, ANIMATIONS } from './config.js';
+
+// The canvas backing store is SCALE x the logical 480x270 world. Sheet sprites are
+// pre-scaled for this density by tools/extract_sprites.py and drawn 1:1 (no runtime resampling).
+export const SCALE = 2;
 
 // ---------- bitmap sprites (one char = one pixel) ----------
 const PAL = {
@@ -363,10 +367,38 @@ function drawSlider(ctx, x, y, c) {
 }
 
 // ---------- renderer ----------
-export function createRenderer(canvas) {
+// `atlas.images` maps sprite keys ('runner/run1', 'obstacles/dog', ...) to loaded images.
+// Any key missing from it falls back to the procedural drawings above.
+export function createRenderer(canvas, atlas = {}) {
+  const images = atlas.images ?? new Map();
   const ctx = canvas.getContext('2d');
   ctx.imageSmoothingEnabled = false;
-  const sprites = Object.fromEntries(Object.entries(SPRITES).map(([k, v]) => [k, bake(v)]));
+  const fallback = Object.fromEntries(Object.entries(SPRITES).map(([k, v]) => [k, bake(v)]));
+  const snap = (v) => Math.round(v * SCALE) / SCALE; // align to backing pixels
+
+  // Draw a sheet sprite with its bottom-centre (or anchorX) at (x, bottom). Returns false if missing.
+  function sprite(key, x, bottom, { flip = false, anchor = 0.5 } = {}) {
+    const img = images.get(key);
+    if (!img) return false;
+    const w = img.width / SCALE;
+    const h = img.height / SCALE;
+    const left = snap(x - (flip ? 1 - anchor : anchor) * w);
+    const top = snap(bottom - h);
+    if (flip) {
+      ctx.save();
+      ctx.translate(left + w, top);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, 0, 0, w, h);
+      ctx.restore();
+    } else {
+      ctx.drawImage(img, left, top, w, h);
+    }
+    return true;
+  }
+
+  function runnerSprite(key, x, y, opts = {}) {
+    return sprite(key, x, y + 1, { anchor: atlas.anchors?.[key] ?? 0.5, ...opts });
+  }
   const skyline = skylineTile();
   const clouds = cloudTile();
   const mids = [parkTile(), trackTile(), roadTile()];
@@ -490,13 +522,34 @@ export function createRenderer(canvas) {
 
   function obstacle(o, phase) {
     const x = Math.round(o.x);
+    const cfg = OBSTACLES[o.type];
     if (o.knocked) {
       ctx.save();
       ctx.globalAlpha = Math.max(0, 1 - o.knockT * 1.5);
       ctx.translate(0, -o.knockT * 180 + o.knockT * o.knockT * 300);
     }
+    const clubFrames = o.type === 'runclub' ? ANIMATIONS.run.frames.filter((f) => images.has(f)) : [];
+    if (clubFrames.length) {
+      // Club members: the runner's own run cycle, mirrored, running at you.
+      const frames = clubFrames;
+      [[10, 0], [30, 2]].forEach(([dx, off]) => {
+        const f = frames[(Math.floor(o.anim / ANIMATIONS.run.frameTime) + off) % frames.length];
+        runnerSprite(f, x + dx, GROUND_Y, { flip: true });
+      });
+      if (Math.sin(o.anim * 3) > -0.2) text(ctx, 'ON YOUR LEFT!', x + 20, GROUND_Y - 52, C.cream, 7);
+    } else if (cfg.sprite && images.has(cfg.sprite)) {
+      // Small idle motion: flyers flap/bob, the dog hops. Hitboxes don't move.
+      const bob = cfg.fly ? Math.round(Math.sin(o.anim * 10) * 1.5) : o.type === 'dog' ? -Math.abs(Math.round(Math.sin(o.anim * 12) * 2)) : 0;
+      sprite(cfg.sprite, x + o.w / 2, GROUND_Y - cfg.lift + bob, { flip: o.type === 'dog' });
+    } else {
+      fallbackObstacle(o, x, cfg, phase);
+    }
+    if (o.knocked) ctx.restore();
+  }
+
+  function fallbackObstacle(o, x, cfg, phase) {
     switch (o.type) {
-      case 'pothole': {
+      case 'puddle': {
         ctx.fillStyle = C.orange; // city spray paint ring
         ctx.fillRect(x + 1, GROUND_Y - 2, o.w - 2, 2);
         ctx.fillRect(x + 1, GROUND_Y + 10, o.w - 2, 2);
@@ -524,40 +577,35 @@ export function createRenderer(canvas) {
           ctx.save();
           ctx.translate(x + dx, 0);
           ctx.scale(-1, 1);
-          drawRunner(ctx, 0, GROUND_Y, phase * 1.1 + ph + o.seed, 'run', CLUB_LOOKS[i]);
+          drawRunner(ctx, 0, GROUND_Y, phase * 1.1 + ph + o.anim, 'run', CLUB_LOOKS[i]);
           ctx.restore();
         });
-        if (Math.sin(phase * 0.25 + o.seed) > -0.2) text(ctx, 'ON YOUR LEFT!', x + 18, GROUND_Y - 52, C.cream, 7);
         break;
       }
-      case 'banner': {
+      default: {
+        // Missing sprite: draw the hitbox as a hazard block so the game stays playable.
+        const [inset, top, bottom] = cfg.box;
         ctx.fillStyle = C.ink;
-        ctx.fillRect(x + 4, 0, 1, GROUND_Y - 52);
-        ctx.fillRect(x + o.w - 5, 0, 1, GROUND_Y - 52);
-        ctx.fillStyle = C.navy;
-        ctx.fillRect(x - 1, GROUND_Y - 53, o.w + 2, 28);
+        ctx.fillRect(x + inset - 1, GROUND_Y - top - 1, o.w - inset * 2 + 2, top - bottom + 2);
         ctx.fillStyle = C.orange;
-        ctx.fillRect(x + 1, GROUND_Y - 51, o.w - 2, 24);
-        ctx.fillStyle = C.cream;
-        for (let i = 0; i < o.w - 2; i += 6) ctx.fillRect(x + 1 + i, GROUND_Y - 30, 3, 3);
-        text(ctx, 'PB OR', x + o.w / 2, GROUND_Y - 46, C.ink, 8, 'center', null);
-        text(ctx, 'BUST', x + o.w / 2, GROUND_Y - 37, C.ink, 8, 'center', null);
-        break;
+        ctx.fillRect(x + inset, GROUND_Y - top, o.w - inset * 2, top - bottom);
       }
     }
-    if (o.knocked) ctx.restore();
   }
 
   function item(it) {
-    const img = sprites[it.type];
     const bob = Math.round(Math.sin(it.bob) * 2);
-    const x = Math.round(it.x - img.width / 2);
-    const y = Math.round(it.y - img.height / 2 + bob);
     if (it.y > GROUND_Y - 20) {
       ctx.fillStyle = 'rgba(11,22,48,0.25)';
       ctx.fillRect(Math.round(it.x - 5), GROUND_Y - 1, 10, 2);
     }
-    ctx.drawImage(img, x, y);
+    const img = images.get(it.sprite);
+    if (img) {
+      sprite(it.sprite, it.x, it.y + img.height / SCALE / 2 + bob);
+      return;
+    }
+    const fb = fallback[it.type] || fallback.kudos;
+    ctx.drawImage(fb, Math.round(it.x - fb.width / 2), Math.round(it.y - fb.height / 2 + bob));
   }
 
   function finishArch(sx) {
@@ -582,6 +630,7 @@ export function createRenderer(canvas) {
 
   function draw(game) {
     const p = game.player;
+    ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
     ctx.save();
     if (game.shake > 0 && !game.reducedMotion) {
       ctx.translate(Math.round((Math.random() - 0.5) * game.shake), Math.round((Math.random() - 0.5) * game.shake));
@@ -611,18 +660,28 @@ export function createRenderer(canvas) {
     for (const o of game.obstacles) obstacle(o, p.phase);
     for (const it of game.items) item(it);
 
-    // player
-    const blink = p.invuln > 0 && Math.floor(p.invuln * 14) % 2 === 0;
+    // player: animation controller frame from the sheet, procedural runner as fallback
+    const blink = p.invuln > 0 && p.anim.state !== 'hit' && Math.floor(p.invuln * 14) % 2 === 0;
     const pose = p.slideT > 0 ? 'slide' : p.onGround ? 'run' : 'jump';
+    // A missing frame borrows another sheet frame (same animation first) instead of mixing art styles.
+    const frame = [game.playerFrame, ...ANIMATIONS[p.anim.state].frames, ...ANIMATIONS.run.frames].find((f) => images.has(f));
+    const drawPlayer = (x, look) => runnerSprite(frame, x, p.y)
+      || drawRunner(ctx, x, p.y, p.phase, pose, look, { sweat: game.stamina <= 0, hurt: p.invuln > 0 });
     if (game.boostT > 0) {
-      ctx.globalAlpha = 0.3;
-      drawRunner(ctx, PLAYER_X - 14, p.y, p.phase - 0.6, pose, { ...PLAYER_LOOK, shirt: C.lime });
-      ctx.globalAlpha = 0.5;
-      drawRunner(ctx, PLAYER_X - 7, p.y, p.phase - 0.3, pose, { ...PLAYER_LOOK, shirt: C.lime });
+      ctx.globalAlpha = 0.25;
+      drawPlayer(PLAYER_X - 14, { ...PLAYER_LOOK, shirt: C.lime });
+      ctx.globalAlpha = 0.45;
+      drawPlayer(PLAYER_X - 7, { ...PLAYER_LOOK, shirt: C.lime });
       ctx.globalAlpha = 1;
     }
-    if (!blink) drawRunner(ctx, PLAYER_X, p.y, p.phase, pose, PLAYER_LOOK, { sweat: game.stamina <= 0, hurt: p.invuln > 0 });
-    if (game.multT > 0 && !blink) text(ctx, 'x2', PLAYER_X, p.y - 50, C.lime, 8);
+    if (!blink) drawPlayer(PLAYER_X, PLAYER_LOOK);
+    if (game.stamina <= 0 && !blink) {
+      // bonk sweat drops
+      ctx.fillStyle = '#8FC8FF';
+      ctx.fillRect(PLAYER_X - 9, p.y - 40 + ((p.phase * 2) % 5), 1, 2);
+      ctx.fillRect(PLAYER_X + 8, p.y - 36 + ((p.phase * 3) % 4), 1, 2);
+    }
+    if (game.multT > 0 && !blink) text(ctx, 'x2', PLAYER_X, p.y - 54, C.lime, 8);
 
     for (const pt of game.particles) {
       ctx.globalAlpha = Math.min(1, pt.life / pt.max + 0.2);

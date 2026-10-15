@@ -1,7 +1,7 @@
 import {
   W, GROUND_Y, PLAYER_X, METERS_PER_PX, FINISH_M, COLORS as C,
-  PHYSICS as P, DIFFICULTY as D, OBSTACLES, STAMINA, SCORING, GEL,
-  ITEMS, ITEM_BAG, LEVELS, ZONES, FEED, CLUB, MEMES, HIT_REACTIONS,
+  PHYSICS as P, DIFFICULTY as D, OBSTACLES, STAMINA, SCORING, BOOST,
+  ITEMS, ITEM_BAG, LEVELS, ZONES, FEED, CLUB, MEMES, HIT_REACTIONS, ANIMATIONS,
 } from './config.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -19,8 +19,13 @@ const ITEM_COLORS = {
   water: [C.blue, C.cream],
   medal: [C.gold, C.blue, C.orange],
   bib: [C.white, C.blue],
-  kudos: [C.orange, C.white],
+  kudos: [C.gold, C.orange],
   hyrox: [C.lime, C.slate],
+  exp: [C.gold, C.cream],
+  health: [C.red, C.cream],
+  boost: [C.blue, C.orange, C.white],
+  brainrot: ['#F48FB1', C.cream],
+  streak: [C.gold, C.orange],
 };
 
 export function formatPace(secPerKm) {
@@ -47,7 +52,8 @@ export class Game {
     this.traveled = 0;
     this.meters = 0;
     this.speed = D.baseSpeed;
-    this.player = { y: GROUND_Y, vy: 0, onGround: true, slideT: 0, slideQueued: false, invuln: 0, phase: 0, jumpBuffer: 0 };
+    this.player = { y: GROUND_Y, vy: 0, onGround: true, slideT: 0, slideQueued: false, invuln: 0, phase: 0, jumpBuffer: 0,
+      anim: { state: 'run', frame: 0, t: 0 } };
     this.slideHeld = false;
     this.lives = 3;
     this.stamina = STAMINA.max;
@@ -148,16 +154,40 @@ export class Game {
   }
 
   obstacleBox(o) {
-    switch (o.type) {
-      case 'pothole': return { x: o.x + 8, y: GROUND_Y - 3, w: o.w - 16, h: 8 };
-      case 'cone': return { x: o.x + 2, y: GROUND_Y - 20, w: o.w - 4, h: 20 };
-      case 'runclub': return { x: o.x + 2, y: GROUND_Y - 30, w: o.w - 4, h: 30 };
-      case 'banner': return { x: o.x, y: 0, w: o.w, h: GROUND_Y - 26 };
-    }
+    const [inset, top, bottom] = OBSTACLES[o.type].box;
+    return { x: o.x + inset, y: GROUND_Y - top, w: o.w - inset * 2, h: top - bottom };
   }
 
-  underBanner() {
-    return this.obstacles.some((o) => o.type === 'banner' && !o.hit && o.x < PLAYER_X + 14 && o.x + o.w > PLAYER_X - 14);
+  underFlyer() {
+    return this.obstacles.some((o) => OBSTACLES[o.type].fly && !o.hit && o.x < PLAYER_X + 14 && o.x + o.w > PLAYER_X - 14);
+  }
+
+  // Current sprite key of the runner animation controller.
+  get playerFrame() {
+    const a = this.player.anim;
+    return ANIMATIONS[a.state].frames[a.frame];
+  }
+
+  updateAnim(h) {
+    const p = this.player;
+    const a = p.anim;
+    const state = this.mode === 'attract' ? 'run'
+      : p.invuln > P.hitInvuln - ANIMATIONS.hit.hold ? 'hit'
+        : p.slideT > 0 ? 'slide'
+          : !p.onGround ? 'jump' : 'run';
+    if (state !== a.state) {
+      a.state = state;
+      a.frame = 0;
+      a.t = 0;
+    }
+    const cfg = ANIMATIONS[state];
+    let ft = cfg.frameTime;
+    if (state === 'run') ft *= (D.baseSpeed / Math.max(this.speed, 1)) * (this.stamina <= 0 ? 1.25 : 1);
+    a.t += h;
+    while (a.t >= ft) {
+      a.t -= ft;
+      a.frame = (a.frame + 1) % cfg.frames.length;
+    }
   }
 
   // ---------- update ----------
@@ -175,7 +205,7 @@ export class Game {
     const attract = this.mode === 'attract';
 
     let target = attract ? 150 : this.targetSpeed();
-    if (!attract && this.boostT > 0) target *= GEL.speedMult;
+    if (!attract && this.boostT > 0) target *= BOOST.speedMult;
     if (!attract && this.stamina <= 0) target *= STAMINA.exhaustedSpeedMult;
     this.speed += (target - this.speed) * Math.min(1, h * 5);
     this.traveled += this.speed * h;
@@ -185,7 +215,10 @@ export class Game {
     this.updateZone(h, attract);
     this.updateProps(h);
     this.updateFx(h);
-    if (attract) return;
+    if (attract) {
+      this.updateAnim(h);
+      return;
+    }
 
     this.t += h;
     this.paceSum += this.pace * h;
@@ -224,10 +257,11 @@ export class Game {
         }
       }
     }
+    this.updateAnim(h);
     if (p.slideT > 0) {
       p.slideT -= h;
-      // Keep sliding while held or still under a banner: never stand up into it.
-      if (p.slideT <= 0 && (this.slideHeld || this.underBanner())) p.slideT = 0.05;
+      // Keep sliding while held or still under a flyer: never stand up into it.
+      if (p.slideT <= 0 && (this.slideHeld || this.underFlyer())) p.slideT = 0.05;
       if (Math.random() < 0.3) this.particles.push(this.particle(PLAYER_X + 8, GROUND_Y - 1, rand(-80, -20), rand(-40, -10), '#C9A26B', 0.3, 2));
     }
 
@@ -243,12 +277,13 @@ export class Game {
       it.x -= (this.speed + (it.extra || 0)) * h;
       it.bob += h * 5;
     }
+    for (const o of this.obstacles) o.anim += h;
     this.obstacles = this.obstacles.filter((o) => o.x > -80);
     this.items = this.items.filter((it) => it.x > -30 && !it.taken);
 
     // hints the first time each obstacle family appears
     for (const o of this.obstacles) {
-      const kind = o.type === 'banner' ? 'slide' : 'jump';
+      const kind = OBSTACLES[o.type].fly ? 'slide' : 'jump';
       if (!this.hintsShown[kind] && o.x < W - 60) {
         this.hintsShown[kind] = true;
         this.emit('callout', {
@@ -333,7 +368,7 @@ export class Game {
 
   // ---------- spawning ----------
   pickType() {
-    const avail = Object.entries(OBSTACLES).filter(([, o]) => this.meters >= o.minM);
+    const avail = Object.entries(OBSTACLES).filter(([, o]) => this.meters >= o.minM && this.level >= (o.minLevel || 0));
     let r = Math.random() * avail.reduce((s, [, o]) => s + o.weight, 0);
     for (const [type, o] of avail) {
       r -= o.weight;
@@ -350,7 +385,7 @@ export class Game {
     // Gap uses the un-boosted speed so it stays fair once the boost ends.
     let gap = this.targetSpeed() * secs + afterW;
     gap += OBSTACLES[type].extraGap || 0;
-    if (this.prevType === 'banner') gap += OBSTACLES.banner.extraGap;
+    if (this.prevType && OBSTACLES[this.prevType].fly) gap += OBSTACLES[this.prevType].extraGap;
     this.nextType = type;
     this.nextObstacleAt = this.traveled + gap;
     return gap;
@@ -359,13 +394,13 @@ export class Game {
   spawnObstacle() {
     const type = this.nextType;
     const cfg = OBSTACLES[type];
-    const o = { type, x: W + 20, w: cfg.w, extra: cfg.extraSpeed || 0, hit: false, knocked: false, knockT: 0, seed: Math.random() * 10 };
+    const o = { type, x: W + 20, w: cfg.w, extra: cfg.extraSpeed || 0, hit: false, knocked: false, knockT: 0, anim: Math.random() * 10 };
     this.obstacles.push(o);
     this.prevType = type;
 
     // Reward over/under the obstacle: kudos follow the path you need to take anyway.
-    if (type === 'banner') {
-      if (Math.random() < 0.7) for (let i = 0; i < 3; i++) this.addItem('kudos', o.x + 10 + i * 14, GROUND_Y - 8, o.extra);
+    if (cfg.fly) {
+      if (Math.random() < 0.7) for (let i = -1; i <= 1; i++) this.addItem('kudos', o.x + o.w / 2 + i * 14, GROUND_Y - 9, o.extra);
     } else if (Math.random() < 0.5) {
       const cx = o.x + o.w / 2;
       [[-16, 50], [0, 62], [16, 50]].forEach(([dx, dy]) => this.addItem('kudos', cx + dx, GROUND_Y - dy, o.extra));
@@ -382,6 +417,7 @@ export class Game {
 
   nextBagItem() {
     if (this.stamina < STAMINA.low && Math.random() < 0.45) return 'water';
+    if (this.lives < 3 && Math.random() < 0.08) return 'health';
     if (!this.bag.length) {
       this.bag = [...ITEM_BAG];
       for (let i = this.bag.length - 1; i > 0; i--) {
@@ -389,11 +425,12 @@ export class Game {
         [this.bag[i], this.bag[j]] = [this.bag[j], this.bag[i]];
       }
     }
-    return this.bag.pop();
+    const next = this.bag.pop();
+    return next === 'health' && this.lives >= 3 ? 'exp' : next;
   }
 
   addItem(type, x, y, extra = 0) {
-    this.items.push({ type, x, y, extra, bob: Math.random() * 6, taken: false });
+    this.items.push({ type, x, y, extra, sprite: pick(ITEMS[type].sprites), bob: Math.random() * 6, taken: false });
   }
 
   // ---------- events ----------
@@ -436,11 +473,26 @@ export class Game {
     this.itemScore += pts;
 
     if (it.type === 'shoes') this.shoes++;
-    if (it.type === 'gel') this.boostT = GEL.boostTime;
     if (it.type === 'bib') this.multT = SCORING.multiplierTime;
+    if (cfg.boost) this.boostT = Math.max(this.boostT, cfg.boost);
     if (cfg.stamina) this.stamina = Math.min(STAMINA.max, this.stamina + cfg.stamina);
-
-    const label = it.type === 'water' ? '+30 STAMINA' : it.type === 'bib' ? `x${SCORING.multiplier} SCORE` : `+${pts}`;
+    if (cfg.streak) {
+      this.combo = SCORING.comboMax;
+      this.comboT = SCORING.comboWindow * 2;
+    }
+    let label = `+${pts}`;
+    if (cfg.life) {
+      if (this.lives < 3) {
+        this.lives++;
+        label = '+1 LIFE';
+      } else {
+        this.itemScore += 100;
+        label = '+100';
+      }
+    }
+    if (it.type === 'water') label = `+${cfg.stamina} STAMINA`;
+    if (it.type === 'bib') label = `x${SCORING.multiplier} SCORE`;
+    if (it.type === 'brainrot') label = '+BRAINROT';
     this.texts.push({ x: it.x, y: it.y - 10, text: label, life: 0.9, color: it.type === 'kudos' ? C.orange : C.lime });
     this.burst(it.x, it.y, ITEM_COLORS[it.type], it.type === 'kudos' ? 6 : 12, 110);
     this.emit('sfx', it.type === 'kudos' ? 'kudos' : 'pickup');
@@ -505,6 +557,8 @@ export class Game {
       shoes: this.shoes,
       maxLevel: this.maxLevel,
       maxLevelTitle: LEVELS[this.maxLevel - 1].title,
+      maxLevelRank: LEVELS[this.maxLevel - 1].rank,
+      maxLevelVariant: LEVELS[this.maxLevel - 1].variant,
       lives: this.lives,
     };
     this.emit('sfx', finished ? 'finish' : 'gameover');
