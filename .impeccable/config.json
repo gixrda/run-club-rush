@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "index.html"
+        ],
+        "createdAt": "2026-10-15T17:11:51.690Z",
+        "reason": "Claude: img[data-sprite] start hidden with no src by design; ui.applySprites sets src and unhides them only after the sprite loads, so no broken box is ever shown"
+      }
+    ]
+  }
+}

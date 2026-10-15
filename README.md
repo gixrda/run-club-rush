@@ -1,44 +1,40 @@
-# Strava Brainrot
+# Run Club Rush (Strava Brainrot)
 
-A pixel-art endless runner parody of running culture. Vite + vanilla JS + Canvas 2D, no backend.
+Italian running-culture parody endless runner. Vite + vanilla JS + Canvas 2D, no backend.
 
 ```bash
 npm install
 npm run dev     # play locally
 npm run build   # production build in dist/
+npm run check   # self-check of the joke picker
 ```
 
-Controls: Space / Up / W or tap left half = jump; Down / S or tap right half = slide (hold to keep sliding); Esc / P = pause; M = sound; Enter = start/retry.
+Controls: Space / Up / W or tap left half = jump; Down / S or tap right half = slide (hold to keep sliding);
+Esc / P = pause; M = sound; Enter = start/retry.
 
 Code map:
-- `src/config.js` – all tuning (physics, difficulty, items, levels, jokes)
-- `src/game.js` – simulation: physics, spawning, collisions, scoring, Brainrot Meter
-- `src/render.js` – procedural pixel art and parallax backgrounds
-- `src/ui.js` – DOM HUD, popups, screens
+- `src/config.js` – all tuning (speed, spawn gaps, obstacles, run clubs, grannies) and all Italian copy/jokes
+- `src/game.js` – simulation: physics, spawning, fairness rules, collisions, scoring, Brainrot Meter
+- `src/render.js` – canvas renderer at device resolution: vector cartoon backgrounds + sheet sprites
+- `src/characters.js` – vector cartoon run-club runners and grannies
+- `src/jokes.js` – random joke picker without immediate repeats
+- `src/ui.js` – DOM HUD, notification queue (one message at a time), screens
+- `src/sprites.js` – asset loader with progress, timeout and fallbacks
 - `src/audio.js` – synthesized sound effects
-- `src/main.js` – loop, input, persistence (localStorage)
-- `src/sprites.js` – preloads the sheet sprites (with progress); missing files fall back to procedural art
+- `src/main.js` – loop, input, loading flow, persistence (localStorage)
 
-## Sprite assets
+## Assets
 
-All in-game art comes from `public/assets/sprite-sheet-reference.png.png` (left untouched).
-`tools/extract_sprites.py` (Python + Pillow) cuts it into individual sprites:
+- `public/assets/logo_runclubrush.png` – official logo, untouched. `tools/prepare_logo.py` writes
+  `logo_runclubrush-web.jpg` (same logo, empty margin trimmed, 1100px wide) used by the title screen;
+  the original is the fallback.
+- `public/assets/sprite-sheet-reference.png.png` – official sprite sheet, untouched.
+  `tools/extract_sprites.py` cuts it into `public/assets/sprites/<category>/<name>.png` (native resolution,
+  1px feathered outline) plus `manifest.json` (source coordinates, size, anchor, use).
+  The canvas renders at device resolution and downsamples these with high-quality smoothing.
+- Run-club members and grannies are drawn as vector cartoons (`src/characters.js`): the sheet has no art for them.
 
-```bash
-python tools/extract_sprites.py                       # regenerate public/assets/sprites/
-python tools/extract_sprites.py --preview check.png   # plus a contact sheet for review
-```
-
-- Each sprite has a hand-measured cell (labels and neighbours excluded). The sheet's alpha
-  channel is a usable matte (sprites ~245, background/glow 20-200), so transparency comes from
-  alpha, never from colour, and dark details (vest, sunglasses, black gear) are preserved.
-- `public/assets/sprites/<category>/<name>.png` = cleaned native resolution (used by the DOM HUD).
-- `public/assets/sprites/<category>/game/<name>.png` = pre-scaled for the 960x540 canvas and drawn 1:1.
-  All runner frames share one scale factor.
-- `public/assets/sprites/manifest.json` = file, source coordinates, size, anchor and use of every sprite.
-
-Known extraction limits: the sheet is painted pixel-art (no exact pixel grid), so game sprites are
-downsampled rather than integer-scaled; the hit pose loses its small "dizzy stars"; `equipment/poles`,
-`nutrition/caffeine` and `equipment/sleeves` keep a little of the dark drop-shadow baked into the matte.
+Known limits: the sheet is painted pixel-art, so sheet sprites keep a light pixel texture; the hit pose
+loses its small "dizzy stars"; poles, caffeine and sleeves keep a bit of baked drop-shadow.
 
 Fictional parody. Not affiliated with Strava or HYROX.

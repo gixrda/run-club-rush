@@ -1,130 +1,11 @@
-import { W, H, GROUND_Y, PLAYER_X, METERS_PER_PX, FINISH_M, COLORS as C, OBSTACLES, ANIMATIONS } from './config.js';
+import {
+  W, H, GROUND_Y, PATH_TOP, BACK_LANE_Y, PLAYER_X, METERS_PER_PX, FINISH_M, COLORS as C,
+  OBSTACLES, ANIMATIONS, RUNNER_HEIGHT, ITEM_SIZE, ITEMS, NONNA,
+} from './config.js';
+import { drawClubRunner, drawNonna, shadow } from './characters.js';
 
-// The canvas backing store is SCALE x the logical 480x270 world. Sheet sprites are
-// pre-scaled for this density by tools/extract_sprites.py and drawn 1:1 (no runtime resampling).
-export const SCALE = 2;
-
-// ---------- bitmap sprites (one char = one pixel) ----------
-const PAL = {
-  K: C.navy, k: C.ink, L: C.lime, O: C.orange, W: C.white, B: C.blue, C: C.cream,
-  G: C.gold, Y: C.goldDark, D: C.slate, R: C.red,
-};
-
-const SPRITES = {
-  shoes: [
-    'KKKK..........',
-    'KLLK..........',
-    'KLLLKK........',
-    'KLLLLOKKK.....',
-    'KLLLLLOOLKK...',
-    'KLLLLLLLOOLKK.',
-    'KLLLLLLLLLLLLK',
-    'KWWWWWWWWWWWWK',
-    'KOWWOWWOWWOWWK',
-    '.KKKKKKKKKKKK.',
-  ],
-  gel: [
-    '..KKKKK..',
-    '..KOOOK..',
-    '.KKKKKKK.',
-    '.KOOOOOK.',
-    'KOOOOOOOK',
-    'KOWWWWWOK',
-    'KOWKWKWOK',
-    'KOWWWWWOK',
-    'KOOOOOOOK',
-    'KOOLLLOOK',
-    'KOOOOOOOK',
-    '.KOOOOOK.',
-    '..KKKKK..',
-  ],
-  water: [
-    '..KKKK..',
-    '..KWWK..',
-    '..KKKK..',
-    '.KBBBBK.',
-    'KBCBBBBK',
-    'KBCBBBBK',
-    'KWWWWWWK',
-    'KWBBBBWK',
-    'KWWWWWWK',
-    'KBCBBBBK',
-    'KBCBBBBK',
-    'KBBBBBBK',
-    'KBBBBBBK',
-    '.KKKKKK.',
-  ],
-  medal: [
-    'KBBK...KOOK',
-    '.KBBK.KOOK.',
-    '..KBBKOOK..',
-    '...KBOOK...',
-    '....KKK....',
-    '...KGGGK...',
-    '..KGGYGGK..',
-    '.KGGYYYGGK.',
-    '.KGYYGYYGK.',
-    '.KGGYYYGGK.',
-    '..KGGYGGK..',
-    '...KGGGK...',
-    '....KKK....',
-  ],
-  bib: [
-    'KKKKKKKKKKKKKK',
-    'KWOWWWWWWWWOWK',
-    'KBBBBBBBBBBBBK',
-    'KWWWWWWWWWWWWK',
-    'KWKWKWWKKKWWWK',
-    'KWKWKWWWWKWWWK',
-    'KWKKKWWKKKWWWK',
-    'KWWWKWWKWWWWWK',
-    'KWWWKWWKKKWWWK',
-    'KWOWWWWWWWWOWK',
-    'KKKKKKKKKKKKKK',
-  ],
-  kudos: [
-    '...KKKKK...',
-    '..KOOOOOK..',
-    '.KOOOOWOOK.',
-    'KOOOOWWOOOK',
-    'KOOOOWOOOOK',
-    'KOWWWWWWWOK',
-    'KOWWWWWWWOK',
-    'KOWWWWWWOOK',
-    '.KOWWWWWOK.',
-    '..KOOOOOK..',
-    '...KKKKK...',
-  ],
-  hyrox: [
-    '...KKKKKK...',
-    '..KDDDDDDK..',
-    '.KDK....KDK.',
-    '.KDK....KDK.',
-    '..KDKKKKDK..',
-    '.KKDDDDDDKK.',
-    'KDDDDDDDDDDK',
-    'KDLLDDDDLLDK',
-    'KDLLLLLLLLDK',
-    'KDLLDDDDLLDK',
-    'KDDDDDDDDDDK',
-    '.KDDDDDDDDK.',
-    '..KKKKKKKK..',
-  ],
-};
-
-function bake(rows) {
-  const c = document.createElement('canvas');
-  c.width = rows[0].length;
-  c.height = rows.length;
-  const g = c.getContext('2d');
-  rows.forEach((row, y) => [...row].forEach((ch, x) => {
-    if (PAL[ch]) {
-      g.fillStyle = PAL[ch];
-      g.fillRect(x, y, 1, 1);
-    }
-  }));
-  return c;
-}
+export const FONT = '"Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif';
+const INK = '#14213D';
 
 // Seeded RNG so background tiles look the same every run.
 function rng(seed) {
@@ -136,254 +17,214 @@ function rng(seed) {
   };
 }
 
-function tile(w, h, paint) {
-  const c = document.createElement('canvas');
-  c.width = w;
-  c.height = h;
-  const g = c.getContext('2d');
-  paint(g);
-  return c;
-}
-
-function skylineTile() {
-  const r = rng(7);
-  return tile(W, 90, (g) => {
-    let x = 0;
-    while (x < W) {
-      const bw = 18 + ((r() * 30) | 0);
-      const bh = 30 + ((r() * 55) | 0);
-      g.fillStyle = r() < 0.5 ? '#22396A' : '#1D3260';
-      g.fillRect(x, 90 - bh, Math.min(bw, W - x), bh);
-      g.fillStyle = 'rgba(255,245,230,0.55)';
-      for (let wy = 90 - bh + 4; wy < 86; wy += 6) {
-        for (let wx = x + 3; wx < x + bw - 3 && wx < W - 2; wx += 5) if (r() < 0.35) g.fillRect(wx, wy, 2, 2);
-      }
-      x += bw + ((r() * 4) | 0);
-    }
-  });
-}
-
-function cloudTile() {
-  const r = rng(3);
-  return tile(W, 70, (g) => {
-    for (let x = 10; x < W - 50; x += 90 + ((r() * 60) | 0)) {
-      const y = 8 + ((r() * 40) | 0);
-      g.fillStyle = 'rgba(255,245,230,0.85)';
-      g.fillRect(x, y + 6, 46, 8);
-      g.fillRect(x + 8, y, 22, 8);
-      g.fillRect(x + 24, y + 3, 14, 6);
-      g.fillStyle = 'rgba(23,43,77,0.15)';
-      g.fillRect(x, y + 12, 46, 2);
-    }
-  });
-}
-
-function parkTile() {
-  const r = rng(11);
-  return tile(W, 80, (g) => {
-    for (let x = 0; x < W; x += 30 + ((r() * 40) | 0)) {
-      const th = 18 + ((r() * 14) | 0);
-      g.fillStyle = '#6B4A2B';
-      g.fillRect(x + 8, 80 - th, 4, th);
-      const cw = 22 + ((r() * 12) | 0);
-      const cy = 80 - th - 18;
-      g.fillStyle = '#13603C';
-      g.fillRect(x + 10 - cw / 2, cy, cw, 22);
-      g.fillStyle = '#1E8F5A';
-      g.fillRect(x + 12 - cw / 2, cy - 5, cw - 4, 20);
-      g.fillStyle = C.green;
-      g.fillRect(x + 14 - cw / 2, cy - 8, cw - 10, 10);
-    }
-    g.fillStyle = '#13603C';
-    for (let x = 0; x < W; x += 9) g.fillRect(x, 74 + ((r() * 3) | 0), 10, 8);
-  });
-}
-
-function trackTile() {
-  const r = rng(23);
-  return tile(W, 80, (g) => {
-    g.fillStyle = '#2A3F73';
-    g.fillRect(0, 20, W, 60);
-    for (let row = 0; row < 7; row++) {
-      g.fillStyle = row % 2 ? '#356BFF' : '#2C5AD6';
-      g.fillRect(0, 24 + row * 8, W, 6);
-      for (let x = 2; x < W; x += 4) {
-        if (r() < 0.55) {
-          g.fillStyle = [C.orange, C.lime, C.cream, C.skin, C.red][(r() * 5) | 0];
-          g.fillRect(x, 22 + row * 8, 2, 3);
-        }
-      }
-    }
-    // floodlights
-    for (const fx of [60, 300]) {
-      g.fillStyle = C.slate;
-      g.fillRect(fx, 0, 3, 24);
-      g.fillStyle = C.cream;
-      g.fillRect(fx - 6, 0, 15, 5);
-    }
-  });
-}
-
-function roadTile() {
-  const r = rng(41);
-  return tile(W, 80, (g) => {
-    let x = 0;
-    const signs = ['GEL & CO', 'SHOES -0%', 'PB CAFE', 'TAPER BAR', 'CARB LOAD'];
-    let i = 0;
-    while (x < W) {
-      const bw = 70 + ((r() * 30) | 0);
-      g.fillStyle = r() < 0.5 ? '#C4532C' : '#2C4F9E';
-      g.fillRect(x, 8, Math.min(bw - 4, W - x), 72);
-      g.fillStyle = C.cream;
-      for (let wy = 14; wy < 50; wy += 12) for (let wx = x + 6; wx < x + bw - 14 && wx < W - 8; wx += 14) g.fillRect(wx, wy, 8, 7);
-      g.fillStyle = C.ink;
-      g.fillRect(x + 6, 56, Math.min(bw - 16, W - x - 8), 14);
-      g.fillStyle = C.lime;
-      g.font = 'bold 8px monospace';
-      g.textBaseline = 'top';
-      g.fillText(signs[i++ % signs.length], x + 9, 59);
-      x += bw;
-    }
-  });
-}
-
-// ---------- drawing helpers ----------
-function line(ctx, x0, y0, x1, y1, w, color) {
-  ctx.fillStyle = color;
-  const dx = x1 - x0;
-  const dy = y1 - y0;
-  const n = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy))));
-  for (let i = 0; i <= n; i++) {
-    ctx.fillRect(Math.round(x0 + (dx * i) / n - w / 2), Math.round(y0 + (dy * i) / n - w / 2), w, w);
-  }
-}
-
-function text(ctx, str, x, y, color, size = 8, align = 'center', outline = C.ink) {
-  ctx.font = `bold ${size}px monospace`;
+function text(ctx, str, x, y, color, size = 9, { align = 'center', outline = INK, weight = 800 } = {}) {
+  ctx.font = `${weight} ${size}px ${FONT}`;
   ctx.textAlign = align;
   ctx.textBaseline = 'middle';
   if (outline) {
-    ctx.fillStyle = outline;
-    for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) ctx.fillText(str, x + ox, y + oy);
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = size * 0.28;
+    ctx.strokeStyle = outline;
+    ctx.strokeText(str, x, y);
   }
   ctx.fillStyle = color;
   ctx.fillText(str, x, y);
 }
 
-const PLAYER_LOOK = { shirt: C.orange, shorts: C.navy, cap: C.blue, shoe: C.lime, sole: C.white, skin: C.skin, skinDark: C.skinDark };
-const CLUB_LOOKS = [
-  { shirt: C.blue, shorts: C.ink, cap: C.lime, shoe: C.orange, sole: C.white, skin: '#8D5A3B', skinDark: '#6E4329' },
-  { shirt: C.blue, shorts: C.ink, cap: C.lime, shoe: C.orange, sole: C.white, skin: '#E8C39E', skinDark: '#C49A73' },
-];
-
-function drawRunner(ctx, x, y, phase, pose, c, extra = {}) {
-  if (pose === 'slide') return drawSlider(ctx, x, y, c);
-  const bob = pose === 'run' ? Math.round(Math.abs(Math.sin(phase)) * 1.5) : 0;
-  const hipX = x;
-  const hipY = y - 18 - bob;
-  const sx = hipX + 2;
-  const sy = hipY - 12;
-
-  const leg = (i) => {
-    const s = phase + (i ? Math.PI : 0);
-    let a;
-    let bend;
-    if (pose === 'jump') {
-      a = i ? -0.5 : 1.1;
-      bend = i ? 0.6 : 1.9;
-    } else {
-      a = Math.sin(s) * 0.85;
-      bend = 0.25 + Math.max(0, Math.cos(s)) * 1.3;
-    }
-    const kx = hipX + Math.sin(a) * 8;
-    const ky = hipY + Math.cos(a) * 8;
-    const fx = kx + Math.sin(a - bend) * 8;
-    const fy = ky + Math.cos(a - bend) * 8;
-    const skin = i ? c.skinDark : c.skin;
-    line(ctx, hipX, hipY, kx, ky, 3, skin);
-    line(ctx, kx, ky, fx, fy, 3, skin);
-    // oversized carbon-plated (probably) shoes
-    ctx.fillStyle = c.shoe;
-    ctx.fillRect(Math.round(fx - 3), Math.round(fy - 3), 9, 3);
-    ctx.fillStyle = c.sole;
-    ctx.fillRect(Math.round(fx - 3), Math.round(fy), 9, 2);
-  };
-
-  const arm = (i) => {
-    const s = phase + (i ? 0 : Math.PI);
-    const up = pose === 'jump' ? (i ? -2.4 : 2.2) : Math.sin(s) * 0.9;
-    const ex = sx + Math.sin(up) * 5;
-    const ey = sy + 1 + Math.cos(up) * 5;
-    const fa = up + 1.5;
-    line(ctx, sx, sy + 1, ex, ey, 2, i ? c.skinDark : c.skin);
-    line(ctx, ex, ey, ex + Math.sin(fa) * 5, ey + Math.cos(fa) * 5, 2, i ? c.skinDark : c.skin);
-  };
-
-  leg(1);
-  arm(1);
-  ctx.fillStyle = c.shorts;
-  ctx.fillRect(hipX - 4, hipY - 2, 8, 5);
-  leg(0);
-  line(ctx, hipX, hipY - 3, sx, sy + 2, 6, c.shirt);
-  ctx.fillStyle = C.cream;
-  ctx.fillRect(sx - 2, sy + 3, 4, 2); // race number vibe
-  // head + cap
-  ctx.fillStyle = c.skin;
-  ctx.fillRect(sx - 3, sy - 8, 7, 7);
-  ctx.fillStyle = C.ink;
-  ctx.fillRect(sx + 2, sy - 6, 1, 1);
-  if (extra.hurt) ctx.fillRect(sx + 1, sy - 3, 2, 2);
-  ctx.fillStyle = c.cap;
-  ctx.fillRect(sx - 4, sy - 10, 8, 3);
-  ctx.fillRect(sx + 3, sy - 8, 3, 1);
-  if (extra.sweat) {
-    ctx.fillStyle = '#8FC8FF';
-    ctx.fillRect(sx - 6, sy - 7 + ((phase * 2) % 4), 1, 2);
-    ctx.fillRect(sx + 6, sy - 4 + ((phase * 3) % 3), 1, 2);
-  }
-  arm(0);
+function outlined(ctx, fill, path, lw = 1) {
+  ctx.beginPath();
+  path();
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.lineWidth = lw;
+  ctx.strokeStyle = INK;
+  ctx.stroke();
 }
 
-function drawSlider(ctx, x, y, c) {
-  const hipX = x - 2;
-  const hipY = y - 5;
-  line(ctx, hipX, hipY, x + 6, y - 3, 3, c.skin);
-  line(ctx, x + 6, y - 3, x + 12, y - 3, 3, c.skin);
-  ctx.fillStyle = c.shoe;
-  ctx.fillRect(x + 11, y - 7, 4, 7);
-  ctx.fillStyle = c.sole;
-  ctx.fillRect(x + 15, y - 7, 2, 7);
-  ctx.fillStyle = c.shorts;
-  ctx.fillRect(hipX - 4, hipY - 3, 7, 5);
-  line(ctx, hipX - 1, hipY - 1, x - 10, y - 10, 6, c.shirt);
-  line(ctx, x - 10, y - 9, x - 13, y - 2, 2, c.skinDark);
-  ctx.fillStyle = c.skin;
-  ctx.fillRect(x - 17, y - 18, 7, 7);
-  ctx.fillStyle = C.ink;
-  ctx.fillRect(x - 12, y - 16, 1, 1);
-  ctx.fillStyle = c.cap;
-  ctx.fillRect(x - 18, y - 20, 8, 3);
-  ctx.fillRect(x - 11, y - 18, 3, 1);
+// ---------- background tiles (vector, rasterised once per resize at device resolution) ----------
+// Each painter draws one 480px-wide tile; elements near an edge are drawn twice so the tile wraps.
+function wrap(x, w, draw) {
+  draw(x);
+  if (x + w > W) draw(x - W);
+  if (x < 0) draw(x + W);
+}
+
+function paintClouds(g) {
+  const r = rng(3);
+  for (let x = 20; x < W; x += 95 + r() * 70) {
+    const y = 14 + r() * 40;
+    const s = 0.8 + r() * 0.6;
+    wrap(x, 50 * s, (cx) => {
+      g.fillStyle = 'rgba(255,255,255,0.92)';
+      for (const [dx, dy, rr] of [[0, 8, 8], [10, 2, 11], [22, 5, 9], [32, 9, 7], [16, 10, 9]]) {
+        g.beginPath();
+        g.arc(cx + dx * s, y + dy * s, rr * s, 0, Math.PI * 2);
+        g.fill();
+      }
+      g.fillStyle = 'rgba(53,107,255,0.12)';
+      g.beginPath();
+      g.ellipse(cx + 17 * s, y + 15 * s, 22 * s, 3 * s, 0, 0, Math.PI * 2);
+      g.fill();
+    });
+  }
+}
+
+function paintSkyline(g) {
+  const r = rng(7);
+  let x = 0;
+  while (x < W) {
+    const bw = 20 + r() * 30;
+    const bh = 35 + r() * 60;
+    const top = 110 - bh;
+    const col = r() < 0.5 ? '#3E5A9A' : '#34508C';
+    g.fillStyle = col;
+    g.beginPath();
+    g.roundRect(x, top, bw - 2, bh, [3, 3, 0, 0]);
+    g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.08)';
+    g.fillRect(x + bw * 0.55, top, bw * 0.45 - 2, bh);
+    g.fillStyle = 'rgba(255,245,230,0.45)';
+    for (let wy = top + 6; wy < 104; wy += 8) {
+      for (let wx = x + 4; wx < x + bw - 6; wx += 6) if (r() < 0.4) g.fillRect(wx, wy, 2.5, 3.5);
+    }
+    if (r() < 0.25) {
+      g.fillStyle = col;
+      g.fillRect(x + bw / 2 - 1, top - 10, 2, 10);
+    }
+    x += bw;
+  }
+}
+
+function paintPark(g) {
+  const r = rng(11);
+  // hedge row
+  for (let x = -10; x < W + 10; x += 14) {
+    g.fillStyle = '#1E8F5A';
+    g.beginPath();
+    g.arc(x, 82, 9 + r() * 3, Math.PI, 0);
+    g.fill();
+  }
+  for (let x = 10; x < W; x += 34 + r() * 40) {
+    const th = 16 + r() * 12;
+    const cw = 13 + r() * 6;
+    const cy = 80 - th - cw * 0.7;
+    wrap(x, cw * 2, (tx) => {
+      outlined(g, '#7A4E2D', () => g.roundRect(tx - 2, 80 - th - 4, 4, th + 6, 1.5), 0.9);
+      for (const [dx, dy, s] of [[-cw * 0.55, cw * 0.25, 0.7], [cw * 0.55, cw * 0.25, 0.7], [0, -cw * 0.2, 0.85]]) {
+        outlined(g, '#2BB673', () => g.arc(tx + dx, cy + dy, cw * s, 0, Math.PI * 2), 1);
+      }
+      g.fillStyle = 'rgba(213,255,82,0.35)';
+      g.beginPath();
+      g.arc(tx - cw * 0.25, cy - cw * 0.4, cw * 0.35, 0, Math.PI * 2);
+      g.fill();
+    });
+  }
+}
+
+function paintTrack(g) {
+  const r = rng(23);
+  outlined(g, '#2A3F73', () => g.roundRect(-2, 26, W + 4, 60, 4), 1);
+  for (let row = 0; row < 6; row++) {
+    g.fillStyle = row % 2 ? '#356BFF' : '#2C5AD6';
+    g.fillRect(0, 32 + row * 9, W, 7);
+    for (let x = 3; x < W; x += 5) {
+      if (r() < 0.6) {
+        g.fillStyle = ['#FF6B35', '#D5FF52', '#FFF5E6', '#F1B58C', '#E5383B', '#FFC93C'][(r() * 6) | 0];
+        g.beginPath();
+        g.arc(x, 31 + row * 9, 1.6, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+  }
+  for (const fx of [70, 310]) {
+    g.fillStyle = '#5C6B8A';
+    g.fillRect(fx, 0, 3, 28);
+    outlined(g, '#FFF5E6', () => g.roundRect(fx - 8, 0, 19, 7, 2), 0.8);
+  }
+}
+
+function paintRoad(g) {
+  const r = rng(41);
+  const signs = ['GEL & CO', 'SCARPE -0%', 'PB CAFFÈ', 'TAPER BAR', 'CARBO LOAD'];
+  let x = 0;
+  let i = 0;
+  while (x < W) {
+    const bw = 78 + r() * 26;
+    const col = r() < 0.5 ? '#E07A4F' : '#4C6FBF';
+    const bx = x;
+    const w = Math.min(bw - 4, W - x);
+    outlined(g, col, () => g.roundRect(bx, 6, w, 80, [4, 4, 0, 0]), 1);
+    g.fillStyle = 'rgba(255,255,255,0.12)';
+    g.fillRect(bx + w * 0.6, 7, w * 0.4 - 1, 78);
+    for (let wy = 14; wy < 46; wy += 14) {
+      for (let wx = bx + 7; wx < bx + w - 14; wx += 17) {
+        outlined(g, '#BFE3FF', () => g.roundRect(wx, wy, 10, 9, 1.5), 0.8);
+      }
+    }
+    // awning + shop sign
+    for (let s = 0; s < w - 8; s += 8) {
+      g.fillStyle = s % 16 ? '#FFF5E6' : '#E5383B';
+      g.fillRect(bx + 4 + s, 52, Math.min(8, w - 8 - s), 6);
+    }
+    outlined(g, INK, () => g.roundRect(bx + 6, 62, w - 12, 14, 3), 0.8);
+    g.font = `800 8px ${FONT}`;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillStyle = '#D5FF52';
+    g.fillText(signs[i++ % signs.length], bx + w / 2, 69.5);
+    x += bw;
+  }
 }
 
 // ---------- renderer ----------
-// `atlas.images` maps sprite keys ('runner/run1', 'obstacles/dog', ...) to loaded images.
-// Any key missing from it falls back to the procedural drawings above.
+// `atlas.images` maps sprite keys ('runner/run1', 'obstacles/dog', ...) to native-resolution images.
+// Keys missing from it fall back to vector shapes, so the game stays playable.
 export function createRenderer(canvas, atlas = {}) {
-  const images = atlas.images ?? new Map();
   const ctx = canvas.getContext('2d');
-  ctx.imageSmoothingEnabled = false;
-  const fallback = Object.fromEntries(Object.entries(SPRITES).map(([k, v]) => [k, bake(v)]));
-  const snap = (v) => Math.round(v * SCALE) / SCALE; // align to backing pixels
+  const images = atlas.images ?? new Map();
+  let scale = canvas.width / W;
+  let tiles = {};
+  const skies = [
+    ['#4F9DFF', '#BFE2FF'],
+    ['#FF8A5B', '#FFE3B8'],
+    ['#24346E', '#7A8FD0'],
+  ];
 
-  // Draw a sheet sprite with its bottom-centre (or anchorX) at (x, bottom). Returns false if missing.
-  function sprite(key, x, bottom, { flip = false, anchor = 0.5 } = {}) {
+  function tile(h, paint) {
+    const c = document.createElement('canvas');
+    c.width = Math.ceil(W * scale);
+    c.height = Math.ceil(h * scale);
+    const g = c.getContext('2d');
+    g.scale(scale, scale);
+    paint(g);
+    return c;
+  }
+
+  function resize(width, height) {
+    canvas.width = width;
+    canvas.height = height;
+    scale = width / W;
+    tiles = {
+      clouds: tile(80, paintClouds),
+      skyline: tile(112, paintSkyline),
+      mids: [tile(92, paintPark), tile(92, paintTrack), tile(92, paintRoad)],
+    };
+  }
+  resize(canvas.width, canvas.height);
+
+  // Logical size of a sheet sprite from its native image and a size spec.
+  function sizeOf(img, spec) {
+    const f = spec.scale ?? (spec.h ? spec.h / img.height : spec.w ? spec.w / img.width : spec.fit / Math.max(img.width, img.height));
+    return [img.width * f, img.height * f];
+  }
+
+  // Draw a sheet sprite with its bottom at `bottom`, anchored horizontally at x.
+  function sprite(key, x, bottom, spec, { flip = false, anchor = 0.5 } = {}) {
     const img = images.get(key);
     if (!img) return false;
-    const w = img.width / SCALE;
-    const h = img.height / SCALE;
-    const left = snap(x - (flip ? 1 - anchor : anchor) * w);
-    const top = snap(bottom - h);
+    const [w, h] = sizeOf(img, spec);
+    const left = x - (flip ? 1 - anchor : anchor) * w;
+    const top = bottom - h;
     if (flip) {
       ctx.save();
       ctx.translate(left + w, top);
@@ -396,313 +237,304 @@ export function createRenderer(canvas, atlas = {}) {
     return true;
   }
 
-  function runnerSprite(key, x, y, opts = {}) {
-    return sprite(key, x, y + 1, { anchor: atlas.anchors?.[key] ?? 0.5, ...opts });
-  }
-  const skyline = skylineTile();
-  const clouds = cloudTile();
-  const mids = [parkTile(), trackTile(), roadTile()];
-  const skies = [
-    ['#5FA8FF', '#7DB9FF', '#9CCBFF', '#BFDDFF', '#DDEEFF'],
-    ['#FF8C5A', '#FFA36E', '#FFBB85', '#FFD3A0', '#FFE8C4'],
-    ['#1B2A57', '#273A72', '#35508F', '#4767A8', '#5E80BE'],
-  ];
+  const runnerScale = () => {
+    const idle = images.get('runner/idle');
+    return idle ? RUNNER_HEIGHT / idle.height : 0.26;
+  };
 
   function scroll(img, factor, y, traveled, alpha = 1) {
     if (alpha <= 0) return;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = alpha;
-    const off = -Math.floor((traveled * factor) % img.width);
-    ctx.drawImage(img, off, y);
-    ctx.drawImage(img, off + img.width, y);
-    ctx.globalAlpha = 1;
+    const off = -Math.floor(((traveled * factor) % W) * scale);
+    const py = Math.round(y * scale);
+    ctx.drawImage(img, off, py);
+    ctx.drawImage(img, off + img.width, py);
+    ctx.restore();
   }
 
-  function sky(zone, alpha) {
+  function sky(zone, alpha, t) {
+    if (alpha <= 0) return;
     ctx.globalAlpha = alpha;
-    const bands = skies[zone];
-    const bh = Math.ceil(GROUND_Y / bands.length);
-    bands.forEach((col, i) => {
-      ctx.fillStyle = col;
-      ctx.fillRect(0, i * bh, W, bh);
-    });
+    const [top, bottom] = skies[zone];
+    const grad = ctx.createLinearGradient(0, 0, 0, PATH_TOP);
+    grad.addColorStop(0, top);
+    grad.addColorStop(1, bottom);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, PATH_TOP + 2);
+    // sun / moon
+    const sun = zone === 2 ? '#FFF5E6' : '#FFC93C';
+    ctx.fillStyle = zone === 2 ? 'rgba(255,245,230,0.25)' : 'rgba(255,201,60,0.3)';
+    ctx.beginPath();
+    ctx.arc(380, zone === 1 ? 95 : 48, 26 + Math.sin(t * 2) * 1.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = sun;
+    ctx.beginPath();
+    ctx.arc(380, zone === 1 ? 95 : 48, 17, 0, Math.PI * 2);
+    ctx.fill();
     ctx.globalAlpha = 1;
   }
 
   function ground(zone, traveled, alpha) {
     if (alpha <= 0) return;
     ctx.globalAlpha = alpha;
-    const scrollX = (period) => -Math.floor(traveled % period);
+    const scrollX = (period) => -(traveled % period);
     if (zone === 0) {
-      ctx.fillStyle = C.green;
-      ctx.fillRect(0, GROUND_Y - 4, W, 4);
-      ctx.fillStyle = '#C9A26B';
-      ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
-      ctx.fillStyle = '#A8824F';
-      for (let x = scrollX(23); x < W; x += 23) ctx.fillRect(x, GROUND_Y + 8 + ((x * 7) & 15), 2, 2);
+      ctx.fillStyle = '#2BB673';
+      ctx.fillRect(0, PATH_TOP - 5, W, 6);
+      const grad = ctx.createLinearGradient(0, PATH_TOP, 0, H);
+      grad.addColorStop(0, '#E2BF85');
+      grad.addColorStop(1, '#C99A5B');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, PATH_TOP, W, H - PATH_TOP);
+      ctx.fillStyle = 'rgba(122,78,45,0.35)';
+      for (let x = scrollX(29); x < W; x += 29) {
+        ctx.beginPath();
+        ctx.ellipse(x, GROUND_Y + 10 + ((x * 7) & 15), 2.2, 1.2, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.fillStyle = '#1E8F5A';
-      ctx.fillRect(0, GROUND_Y + 36, W, H - GROUND_Y - 36);
+      ctx.fillRect(0, GROUND_Y + 30, W, H - GROUND_Y - 30);
+      ctx.fillStyle = '#2BB673';
+      for (let x = scrollX(12); x < W; x += 12) {
+        ctx.beginPath();
+        ctx.moveTo(x, GROUND_Y + 31);
+        ctx.lineTo(x + 3, GROUND_Y + 25);
+        ctx.lineTo(x + 6, GROUND_Y + 31);
+        ctx.fill();
+      }
     } else if (zone === 1) {
+      ctx.fillStyle = '#2BB673';
+      ctx.fillRect(0, PATH_TOP - 4, W, 5);
       ctx.fillStyle = '#D9572B';
-      ctx.fillRect(0, GROUND_Y - 2, W, H - GROUND_Y + 2);
-      ctx.fillStyle = C.cream;
-      for (const ly of [GROUND_Y + 12, GROUND_Y + 28, GROUND_Y + 44]) ctx.fillRect(0, ly, W, 2);
+      ctx.fillRect(0, PATH_TOP, W, H - PATH_TOP);
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      for (const ly of [PATH_TOP + 1, GROUND_Y + 5, GROUND_Y + 22, GROUND_Y + 39]) ctx.fillRect(0, ly, W, 1.4);
       for (let x = scrollX(160); x < W; x += 160) {
-        ctx.fillRect(x, GROUND_Y + 2, 2, 46);
-        ctx.font = 'bold 8px monospace';
-        ctx.textAlign = 'left';
-        ctx.fillText('100m', x + 5, GROUND_Y + 20);
+        ctx.fillRect(x, GROUND_Y + 5, 1.4, 34);
+        text(ctx, '100m', x + 16, GROUND_Y + 14, 'rgba(255,255,255,0.9)', 8, { outline: null });
       }
     } else {
-      ctx.fillStyle = C.cream;
-      ctx.fillRect(0, GROUND_Y - 4, W, 4);
-      ctx.fillStyle = C.navy;
-      for (let x = scrollX(24); x < W; x += 24) ctx.fillRect(x, GROUND_Y - 4, 12, 4);
-      ctx.fillStyle = '#3B4560';
-      ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
-      ctx.fillStyle = C.gold;
-      for (let x = scrollX(48); x < W; x += 48) ctx.fillRect(x, GROUND_Y + 24, 24, 3);
+      ctx.fillStyle = '#C9CED8';
+      ctx.fillRect(0, PATH_TOP - 5, W, 5);
+      ctx.fillStyle = '#8D95A6';
+      for (let x = scrollX(26); x < W; x += 26) ctx.fillRect(x, PATH_TOP - 5, 1, 5);
+      ctx.fillStyle = '#495266';
+      ctx.fillRect(0, PATH_TOP, W, H - PATH_TOP);
+      ctx.fillStyle = '#FFC93C';
+      for (let x = scrollX(52); x < W; x += 52) {
+        ctx.beginPath();
+        ctx.roundRect(x, GROUND_Y + 22, 26, 3, 1.5);
+        ctx.fill();
+      }
     }
     ctx.globalAlpha = 1;
   }
 
   function billboard(x, lines, accent) {
-    const bx = Math.round(x);
-    const by = GROUND_Y - 78;
-    ctx.fillStyle = C.slate;
-    ctx.fillRect(bx + 14, by + 36, 3, 42);
-    ctx.fillRect(bx + 95, by + 36, 3, 42);
-    ctx.fillStyle = C.ink;
-    ctx.fillRect(bx - 2, by - 2, 116, 40);
-    ctx.fillStyle = accent;
-    ctx.fillRect(bx, by, 112, 36);
-    ctx.fillStyle = C.ink;
-    ctx.fillRect(bx, by, 112, 12);
-    lines.forEach((l, i) => text(ctx, l, bx + 56, by + 6 + i * 11, i === 0 ? accent : C.ink, 8, 'center', null));
+    const by = PATH_TOP - 80;
+    ctx.fillStyle = '#5C6B8A';
+    ctx.fillRect(x + 18, by + 38, 3, 44);
+    ctx.fillRect(x + 92, by + 38, 3, 44);
+    outlined(ctx, accent, () => ctx.roundRect(x, by, 113, 40, 5), 1.2);
+    outlined(ctx, INK, () => ctx.roundRect(x, by, 113, 13, [5, 5, 0, 0]), 1.2);
+    text(ctx, lines[0], x + 56.5, by + 7, accent, 7.5, { outline: null });
+    lines.slice(1).forEach((l, i) => text(ctx, l, x + 56.5, by + 20 + i * 10, INK, 7.5, { outline: null }));
   }
 
   function prop(pr) {
     if (pr.type === 'club') {
       const variants = [
-        ['BRAINROT RUN CLUB', 'EASY 5K @ 4:00/KM', 'NO PHOTO NO RUN'],
-        ['RUN CLUB TONIGHT', 'RECOVERY PACE*', '*NOT RECOVERY'],
-        ['BRAINROT RUN CLUB', 'EST. LAST TUESDAY', 'SINGLES WELCOME'],
+        ['BRAINROT RUN CLUB', 'EASY 5K A 4:00/KM', 'NO FOTO, NO CORSA'],
+        ['RUN CLUB STASERA', 'PASSO TRANQUILLO*', '*NON TRANQUILLO'],
+        ['BRAINROT RUN CLUB', 'DAL MARTEDÌ SCORSO', 'SINGLE BENVENUTI'],
       ];
       billboard(pr.x, variants[pr.variant], C.lime);
     } else if (pr.type === 'coffee') {
-      billboard(pr.x, ['COFFEE AFTER', 'THE REAL', 'FINISH LINE'], C.orange);
+      billboard(pr.x, ['CAFFÈ POST-CORSA', 'IL VERO', 'TRAGUARDO'], C.orange);
     } else {
-      // HYROX station: rower + dumbbells on a platform
-      const bx = Math.round(pr.x);
-      const by = GROUND_Y - 2;
-      ctx.fillStyle = C.ink;
-      ctx.fillRect(bx, by - 4, 100, 4);
-      ctx.fillStyle = C.slate;
-      ctx.fillRect(bx + 8, by - 9, 46, 3); // rail
-      ctx.fillStyle = C.ink;
-      ctx.fillRect(bx + 6, by - 18, 12, 12); // flywheel
+      // HYROX station: rower + dumbbells on a mat
+      const bx = pr.x;
+      const by = PATH_TOP + 1;
+      outlined(ctx, '#2A2F3D', () => ctx.roundRect(bx, by - 4, 100, 5, 2), 0.8);
+      outlined(ctx, '#5C6B8A', () => ctx.roundRect(bx + 8, by - 10, 48, 3, 1.5), 0.8);
+      outlined(ctx, '#2A2F3D', () => ctx.arc(bx + 12, by - 13, 7, 0, Math.PI * 2), 0.8);
       ctx.fillStyle = C.lime;
-      ctx.fillRect(bx + 9, by - 15, 6, 6);
-      ctx.fillStyle = C.orange;
-      ctx.fillRect(bx + 32, by - 12, 8, 3); // seat
-      for (const dx of [64, 82]) {
-        ctx.fillStyle = C.ink;
-        ctx.fillRect(bx + dx, by - 10, 4, 6);
-        ctx.fillRect(bx + dx + 10, by - 10, 4, 6);
-        ctx.fillStyle = C.slate;
-        ctx.fillRect(bx + dx + 4, by - 8, 6, 2);
+      ctx.beginPath();
+      ctx.arc(bx + 12, by - 13, 3, 0, Math.PI * 2);
+      ctx.fill();
+      outlined(ctx, C.orange, () => ctx.roundRect(bx + 32, by - 14, 9, 4, 1.5), 0.8);
+      for (const dx of [66, 84]) {
+        outlined(ctx, '#2A2F3D', () => ctx.roundRect(bx + dx, by - 11, 4, 7, 1), 0.8);
+        outlined(ctx, '#2A2F3D', () => ctx.roundRect(bx + dx + 10, by - 11, 4, 7, 1), 0.8);
+        ctx.fillStyle = '#9AA5B8';
+        ctx.fillRect(bx + dx + 4, by - 8.5, 6, 2);
       }
-      ctx.fillStyle = C.slate;
-      ctx.fillRect(bx + 48, by - 52, 3, 48);
-      ctx.fillStyle = C.ink;
-      ctx.fillRect(bx + 18, by - 66, 66, 18);
-      text(ctx, 'HYROX STATION', bx + 51, by - 61, C.lime, 7, 'center', null);
-      text(ctx, `${pr.variant + 3}/8: ROW`, bx + 51, by - 53, C.cream, 7, 'center', null);
+      ctx.fillStyle = '#5C6B8A';
+      ctx.fillRect(bx + 49, by - 52, 3, 48);
+      outlined(ctx, INK, () => ctx.roundRect(bx + 14, by - 70, 74, 21, 4), 1);
+      text(ctx, 'STAZIONE HYROX', bx + 51, by - 64, C.lime, 7.5, { outline: null });
+      text(ctx, `${pr.variant + 3}/8 · ROWING`, bx + 51, by - 55, C.cream, 7, { outline: null });
     }
   }
 
-  function obstacle(o, phase) {
-    const x = Math.round(o.x);
+  function finishArch(x) {
+    const top = GROUND_Y - 92;
+    for (const px of [x - 8, x + 62]) outlined(ctx, C.orange, () => ctx.roundRect(px, top + 8, 10, GROUND_Y - top - 6, 5), 1.2);
+    outlined(ctx, C.orange, () => ctx.roundRect(x - 12, top, 88, 20, 10), 1.2);
+    text(ctx, 'TRAGUARDO', x + 32, top + 10, C.cream, 9);
+    for (let i = 0; i < 9; i++) {
+      ctx.fillStyle = i % 2 ? INK : C.cream;
+      ctx.fillRect(x + 4 + i * 6, GROUND_Y - 1, 6, 3);
+      ctx.fillStyle = i % 2 ? C.cream : INK;
+      ctx.fillRect(x + 4 + i * 6, GROUND_Y + 2, 6, 3);
+    }
+  }
+
+  // ---------- obstacles ----------
+  function groupMembers(o, lane) {
+    for (const m of o.members) {
+      if (m.lane !== lane) continue;
+      const mx = o.x + m.dx;
+      if (o.type === 'runclub') {
+        const back = lane === 'back';
+        drawClubRunner(ctx, mx, back ? BACK_LANE_Y : GROUND_Y, o.anim * 9 + m.phase, m.look, { facing: 1, scale: m.scale });
+        continue;
+      }
+      // Granny crossing: walks from the back lane into the runner's lane long before reaching it.
+      let y = lane === 'back' ? BACK_LANE_Y : GROUND_Y;
+      if (m.cross) y = GROUND_Y - (GROUND_Y - PATH_TOP + 2) * Math.min(1, Math.max(0, (mx - NONNA.crossEndX) / NONNA.crossLen));
+      drawNonna(ctx, mx, y, o.anim * 3.2 + m.dx, m.look, { facing: m.facing, scale: lane === 'back' ? 0.9 : 1, prop: m.prop });
+    }
+  }
+
+  function obstacle(o) {
     const cfg = OBSTACLES[o.type];
     if (o.knocked) {
       ctx.save();
       ctx.globalAlpha = Math.max(0, 1 - o.knockT * 1.5);
       ctx.translate(0, -o.knockT * 180 + o.knockT * o.knockT * 300);
     }
-    const clubFrames = o.type === 'runclub' ? ANIMATIONS.run.frames.filter((f) => images.has(f)) : [];
-    if (clubFrames.length) {
-      // Club members: the runner's own run cycle, mirrored, running at you.
-      const frames = clubFrames;
-      [[10, 0], [30, 2]].forEach(([dx, off]) => {
-        const f = frames[(Math.floor(o.anim / ANIMATIONS.run.frameTime) + off) % frames.length];
-        runnerSprite(f, x + dx, GROUND_Y, { flip: true });
-      });
-      if (Math.sin(o.anim * 3) > -0.2) text(ctx, 'ON YOUR LEFT!', x + 20, GROUND_Y - 52, C.cream, 7);
+    if (o.members) {
+      groupMembers(o, 'front');
+      if (o.type === 'runclub' && !o.hit && Math.sin(o.anim * 2) > -0.3) text(ctx, 'A SINISTRA!', o.x + 6, GROUND_Y - 74, C.cream, 7.5);
     } else if (cfg.sprite && images.has(cfg.sprite)) {
-      // Small idle motion: flyers flap/bob, the dog hops. Hitboxes don't move.
-      const bob = cfg.fly ? Math.round(Math.sin(o.anim * 10) * 1.5) : o.type === 'dog' ? -Math.abs(Math.round(Math.sin(o.anim * 12) * 2)) : 0;
-      sprite(cfg.sprite, x + o.w / 2, GROUND_Y - cfg.lift + bob, { flip: o.type === 'dog' });
+      // Small idle motion: flyers bob, the dog hops. Hitboxes don't move.
+      const bob = cfg.fly ? Math.sin(o.anim * 9) * 1.5 : o.type === 'dog' ? -Math.abs(Math.sin(o.anim * 11) * 2) : 0;
+      if (!cfg.fly) shadow(ctx, o.x + o.w / 2, GROUND_Y, o.w * 0.45);
+      sprite(cfg.sprite, o.x + o.w / 2, GROUND_Y - cfg.lift + bob, cfg.size, { flip: o.type === 'dog' });
     } else {
-      fallbackObstacle(o, x, cfg, phase);
+      // Missing sprite: draw the hitbox as a hazard block so the game stays playable.
+      const [inset, top, bottom] = cfg.box;
+      outlined(ctx, C.orange, () => ctx.roundRect(o.x + inset, GROUND_Y - top, o.w - inset * 2, top - bottom, 3), 1);
     }
     if (o.knocked) ctx.restore();
   }
 
-  function fallbackObstacle(o, x, cfg, phase) {
-    switch (o.type) {
-      case 'puddle': {
-        ctx.fillStyle = C.orange; // city spray paint ring
-        ctx.fillRect(x + 1, GROUND_Y - 2, o.w - 2, 2);
-        ctx.fillRect(x + 1, GROUND_Y + 10, o.w - 2, 2);
-        ctx.fillRect(x - 1, GROUND_Y, 2, 10);
-        ctx.fillRect(x + o.w - 1, GROUND_Y, 2, 10);
-        ctx.fillStyle = C.ink;
-        ctx.fillRect(x + 4, GROUND_Y, o.w - 8, 7);
-        ctx.fillRect(x + 8, GROUND_Y + 7, o.w - 16, 3);
-        ctx.fillStyle = '#000';
-        ctx.fillRect(x + 10, GROUND_Y + 2, o.w - 20, 5);
-        break;
-      }
-      case 'cone': {
-        for (let i = 0; i < 20; i++) {
-          const w = 2 + Math.floor(i * 0.5);
-          ctx.fillStyle = i === 7 || i === 8 || i === 13 || i === 14 ? C.white : C.orange;
-          ctx.fillRect(x + 7 - Math.floor(w / 2), GROUND_Y - 22 + i, w, 1);
-        }
-        ctx.fillStyle = C.ink;
-        ctx.fillRect(x - 1, GROUND_Y - 3, 16, 3);
-        break;
-      }
-      case 'runclub': {
-        [[10, 0], [28, Math.PI * 0.6]].forEach(([dx, ph], i) => {
-          ctx.save();
-          ctx.translate(x + dx, 0);
-          ctx.scale(-1, 1);
-          drawRunner(ctx, 0, GROUND_Y, phase * 1.1 + ph + o.anim, 'run', CLUB_LOOKS[i]);
-          ctx.restore();
-        });
-        break;
-      }
-      default: {
-        // Missing sprite: draw the hitbox as a hazard block so the game stays playable.
-        const [inset, top, bottom] = cfg.box;
-        ctx.fillStyle = C.ink;
-        ctx.fillRect(x + inset - 1, GROUND_Y - top - 1, o.w - inset * 2 + 2, top - bottom + 2);
-        ctx.fillStyle = C.orange;
-        ctx.fillRect(x + inset, GROUND_Y - top, o.w - inset * 2, top - bottom);
-      }
-    }
-  }
-
   function item(it) {
-    const bob = Math.round(Math.sin(it.bob) * 2);
-    if (it.y > GROUND_Y - 20) {
-      ctx.fillStyle = 'rgba(11,22,48,0.25)';
-      ctx.fillRect(Math.round(it.x - 5), GROUND_Y - 1, 10, 2);
-    }
+    const bob = Math.sin(it.bob) * 1.8;
+    const cfg = ITEMS[it.type];
+    if (it.y > GROUND_Y - 20) shadow(ctx, it.x, GROUND_Y, 6);
     const img = images.get(it.sprite);
     if (img) {
-      sprite(it.sprite, it.x, it.y + img.height / SCALE / 2 + bob);
+      const [, h] = sizeOf(img, { fit: cfg.size ?? ITEM_SIZE });
+      // soft light halo keeps pickups readable on busy backgrounds
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.beginPath();
+      ctx.arc(it.x, it.y + bob, (cfg.size ?? ITEM_SIZE) * 0.55, 0, Math.PI * 2);
+      ctx.fill();
+      sprite(it.sprite, it.x, it.y + h / 2 + bob, { fit: cfg.size ?? ITEM_SIZE });
       return;
     }
-    const fb = fallback[it.type] || fallback.kudos;
-    ctx.drawImage(fb, Math.round(it.x - fb.width / 2), Math.round(it.y - fb.height / 2 + bob));
+    outlined(ctx, C.gold, () => ctx.arc(it.x, it.y + bob, 6, 0, Math.PI * 2), 1);
   }
 
-  function finishArch(sx) {
-    const x = Math.round(sx);
-    ctx.fillStyle = C.ink;
-    ctx.fillRect(x - 2, GROUND_Y - 80, 4, 80);
-    ctx.fillRect(x + 58, GROUND_Y - 80, 4, 80);
-    for (let i = 0; i < 16; i++) {
-      ctx.fillStyle = i % 2 ? C.ink : C.cream;
-      ctx.fillRect(x + i * 4 - 2, GROUND_Y - 92, 4, 4);
-      ctx.fillStyle = i % 2 ? C.cream : C.ink;
-      ctx.fillRect(x + i * 4 - 2, GROUND_Y - 88, 4, 4);
-    }
-    ctx.fillStyle = C.orange;
-    ctx.fillRect(x - 2, GROUND_Y - 84, 64, 12);
-    text(ctx, 'FINISH', x + 30, GROUND_Y - 78, C.cream, 8, 'center', null);
-    for (let i = 0; i < 8; i++) {
-      ctx.fillStyle = i % 2 ? C.ink : C.cream;
-      ctx.fillRect(x - 1, GROUND_Y + i * 4, 3, 4);
-    }
+  function fallbackRunner(x, y) {
+    drawClubRunner(ctx, x, y, performance.now() / 90, { shirt: C.orange, shorts: C.navy, shoe: C.lime, skin: C.skin, hair: '#4A2C1A', cap: C.blue });
   }
 
   function draw(game) {
     const p = game.player;
-    ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
     ctx.save();
     if (game.shake > 0 && !game.reducedMotion) {
-      ctx.translate(Math.round((Math.random() - 0.5) * game.shake), Math.round((Math.random() - 0.5) * game.shake));
+      ctx.translate((Math.random() - 0.5) * game.shake, (Math.random() - 0.5) * game.shake);
     }
 
     // background layers (cross-fade between zones)
     const zb = game.zoneBlend;
-    sky(game.prevZone, 1);
-    sky(game.zone, zb);
+    sky(game.prevZone, 1, game.t);
+    sky(game.zone, zb, game.t);
     if (game.level >= 5 && !game.reducedMotion) {
-      // brainrot sky: slow cycling tint
-      ctx.fillStyle = `hsla(${(game.t * 60) % 360}, 90%, 60%, 0.18)`;
-      ctx.fillRect(0, 0, W, GROUND_Y);
+      ctx.fillStyle = `hsla(${(game.t * 50) % 360}, 90%, 60%, 0.15)`;
+      ctx.fillRect(0, 0, W, PATH_TOP);
     }
-    scroll(clouds, 0.04, 10, game.traveled + game.t * 200);
-    scroll(skyline, 0.1, GROUND_Y - 110, game.traveled);
-    scroll(mids[game.prevZone], 0.35, GROUND_Y - 80, game.traveled, 1 - zb);
-    scroll(mids[game.zone], 0.35, GROUND_Y - 80, game.traveled, zb);
+    scroll(tiles.clouds, 0.04, 6, game.traveled + game.t * 160);
+    scroll(tiles.skyline, 0.1, PATH_TOP - 118, game.traveled);
+    scroll(tiles.mids[game.prevZone], 0.35, PATH_TOP - 88, game.traveled, 1 - zb);
+    scroll(tiles.mids[game.zone], 0.35, PATH_TOP - 88, game.traveled, zb);
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
     for (const pr of game.props) prop(pr);
     ground(game.prevZone, game.traveled, 1);
     ground(game.zone, game.traveled, zb);
 
-    // finish arch
-    const finishScreenX = PLAYER_X + (FINISH_M / METERS_PER_PX - game.traveled);
-    if (game.mode !== 'attract' && finishScreenX < W + 40 && finishScreenX > -80) finishArch(finishScreenX);
+    const finishX = PLAYER_X + (FINISH_M / METERS_PER_PX - game.traveled);
+    if (game.mode !== 'attract' && finishX < W + 60 && finishX > -100) finishArch(finishX);
 
-    for (const o of game.obstacles) obstacle(o, p.phase);
+    // back lane first (behind the runner), then the runner's lane
+    for (const o of game.obstacles) if (o.members) groupMembers(o, 'back');
+    for (const o of game.obstacles) obstacle(o);
     for (const it of game.items) item(it);
 
-    // player: animation controller frame from the sheet, procedural runner as fallback
-    const blink = p.invuln > 0 && p.anim.state !== 'hit' && Math.floor(p.invuln * 14) % 2 === 0;
-    const pose = p.slideT > 0 ? 'slide' : p.onGround ? 'run' : 'jump';
-    // A missing frame borrows another sheet frame (same animation first) instead of mixing art styles.
+    // player: animation-controller frame from the sheet (a missing frame borrows another one)
+    const blink = p.invuln > 0 && p.anim.state !== 'hit' && Math.floor(p.invuln * 12) % 2 === 0;
     const frame = [game.playerFrame, ...ANIMATIONS[p.anim.state].frames, ...ANIMATIONS.run.frames].find((f) => images.has(f));
-    const drawPlayer = (x, look) => runnerSprite(frame, x, p.y)
-      || drawRunner(ctx, x, p.y, p.phase, pose, look, { sweat: game.stamina <= 0, hurt: p.invuln > 0 });
+    const rs = { scale: runnerScale() };
+    const drawPlayer = (x) => (frame ? sprite(frame, x, p.y + 1, rs, { anchor: atlas.anchors?.[frame] ?? 0.5 }) : fallbackRunner(x, p.y));
+    shadow(ctx, PLAYER_X, GROUND_Y, p.onGround ? 10 : Math.max(4, 10 - (GROUND_Y - p.y) / 10));
     if (game.boostT > 0) {
-      ctx.globalAlpha = 0.25;
-      drawPlayer(PLAYER_X - 14, { ...PLAYER_LOOK, shirt: C.lime });
-      ctx.globalAlpha = 0.45;
-      drawPlayer(PLAYER_X - 7, { ...PLAYER_LOOK, shirt: C.lime });
+      ctx.globalAlpha = 0.22;
+      drawPlayer(PLAYER_X - 14);
+      ctx.globalAlpha = 0.4;
+      drawPlayer(PLAYER_X - 7);
       ctx.globalAlpha = 1;
     }
-    if (!blink) drawPlayer(PLAYER_X, PLAYER_LOOK);
+    if (!blink) drawPlayer(PLAYER_X);
     if (game.stamina <= 0 && !blink) {
-      // bonk sweat drops
       ctx.fillStyle = '#8FC8FF';
-      ctx.fillRect(PLAYER_X - 9, p.y - 40 + ((p.phase * 2) % 5), 1, 2);
-      ctx.fillRect(PLAYER_X + 8, p.y - 36 + ((p.phase * 3) % 4), 1, 2);
+      for (const [dx, dy, k] of [[-10, -46, 2], [9, -42, 3]]) {
+        ctx.beginPath();
+        ctx.ellipse(PLAYER_X + dx, p.y + dy + ((p.phase * k) % 5), 1.1, 1.8, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
-    if (game.multT > 0 && !blink) text(ctx, 'x2', PLAYER_X, p.y - 54, C.lime, 8);
+    if (game.multT > 0 && !blink) text(ctx, 'x2', PLAYER_X, p.y - 60, C.lime, 10);
 
     for (const pt of game.particles) {
       ctx.globalAlpha = Math.min(1, pt.life / pt.max + 0.2);
       ctx.fillStyle = pt.color;
-      ctx.fillRect(Math.round(pt.x), Math.round(pt.y), pt.size, pt.size);
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, pt.size * 0.6, 0, Math.PI * 2);
+      ctx.fill();
     }
     ctx.globalAlpha = 1;
     for (const tx of game.texts) {
       ctx.globalAlpha = Math.min(1, tx.life * 2);
-      text(ctx, tx.text, tx.x, tx.y, tx.color, 8);
+      text(ctx, tx.text, tx.x, tx.y, tx.color, 10);
     }
     ctx.globalAlpha = 1;
     ctx.restore();
 
     if (game.flash > 0 && !game.reducedMotion) {
-      ctx.globalAlpha = Math.min(0.35, game.flash);
+      ctx.globalAlpha = Math.min(0.3, game.flash);
       ctx.fillStyle = game.flashColor;
       ctx.fillRect(0, 0, W, H);
       ctx.globalAlpha = 1;
     }
   }
 
-  return { draw };
+  return { draw, resize };
 }

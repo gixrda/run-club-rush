@@ -1,10 +1,12 @@
 import {
   W, GROUND_Y, PLAYER_X, METERS_PER_PX, FINISH_M, COLORS as C,
-  PHYSICS as P, DIFFICULTY as D, OBSTACLES, STAMINA, SCORING, BOOST,
-  ITEMS, ITEM_BAG, LEVELS, ZONES, FEED, CLUB, MEMES, HIT_REACTIONS, ANIMATIONS,
+  PHYSICS as P, DIFFICULTY as D, OBSTACLES, RUN_CLUB, NONNA, STAMINA, SCORING, BOOST,
+  ITEMS, ITEM_BAG, LEVELS, ZONES, HIT_REACTIONS, ANIMATIONS,
 } from './config.js';
+import { joke } from './jokes.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
+const randInt = (a, b) => Math.floor(rand(a, b + 1));
 const pick = (arr) => arr[(Math.random() * arr.length) | 0];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -12,6 +14,9 @@ export const overlap = (a, b) =>
   a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
 const STEP = 1 / 120; // physics substep: no tunnelling through thin cones at low FPS
+
+// Message priorities for the notification queue (ui.js): higher preempts lower.
+export const PRIO = { low: 1, normal: 2, high: 3 };
 
 const ITEM_COLORS = {
   shoes: [C.lime, C.orange, C.white],
@@ -52,8 +57,10 @@ export class Game {
     this.traveled = 0;
     this.meters = 0;
     this.speed = D.baseSpeed;
-    this.player = { y: GROUND_Y, vy: 0, onGround: true, slideT: 0, slideQueued: false, invuln: 0, phase: 0, jumpBuffer: 0,
-      anim: { state: 'run', frame: 0, t: 0 } };
+    this.player = {
+      y: GROUND_Y, vy: 0, onGround: true, slideT: 0, slideQueued: false, invuln: 0, phase: 0, jumpBuffer: 0,
+      anim: { state: 'run', frame: 0, t: 0 },
+    };
     this.slideHeld = false;
     this.lives = 3;
     this.stamina = STAMINA.max;
@@ -74,13 +81,12 @@ export class Game {
     this.texts = [];
     this.props = [];
     this.bag = [];
-    this.prevType = null;
     this.shake = 0;
     this.flash = 0;
     this.flashColor = C.white;
-    this.feedT = rand(5, 8);
-    this.memeT = 3;
-    this.kudosQuoteT = 0;
+    this.feedT = rand(8, 11);
+    this.memeT = 4;
+    this.kudosQuoteT = 4;
     this.nextKm = 1;
     this.zone = 0;
     this.prevZone = 0;
@@ -91,6 +97,10 @@ export class Game {
     this.result = null;
     this.nextObstacleAt = D.firstObstaclePx;
     this.nextType = 'cone';
+  }
+
+  say(text, kind = 'good', priority = PRIO.normal) {
+    this.emit('callout', { text, kind, priority });
   }
 
   // ---------- input ----------
@@ -136,7 +146,13 @@ export class Game {
   get pace() {
     // Map scroll speed to a believable (and increasingly delusional) pace in sec/km.
     const f = clamp((this.speed - D.baseSpeed) / (D.maxSpeed - D.baseSpeed), -0.3, 1.4);
-    return 330 - f * 150;
+    return 360 - f * 165;
+  }
+
+  // An obstacle is about to reach the runner: the UI holds back low-priority chatter.
+  get imminent() {
+    const reach = this.speed * D.imminentSeconds;
+    return this.obstacles.some((o) => !o.hit && o.x + (o.span || o.w) > PLAYER_X - 10 && o.x - PLAYER_X < reach);
   }
 
   targetSpeed() {
@@ -153,9 +169,15 @@ export class Game {
       : { x: PLAYER_X - P.standW / 2, y: p.y - P.standH, w: P.standW, h: P.standH };
   }
 
-  obstacleBox(o) {
+  // Hitboxes of an obstacle. Groups only collide through members in the player's lane.
+  obstacleBoxes(o) {
+    if (o.members) {
+      return o.members.filter((m) => m.lane === 'front').map((m) => ({
+        x: o.x + m.dx - m.w / 2 + 2, y: GROUND_Y - m.h, w: m.w - 4, h: m.h,
+      }));
+    }
     const [inset, top, bottom] = OBSTACLES[o.type].box;
-    return { x: o.x + inset, y: GROUND_Y - top, w: o.w - inset * 2, h: top - bottom };
+    return [{ x: o.x + inset, y: GROUND_Y - top, w: o.w - inset * 2, h: top - bottom }];
   }
 
   underFlyer() {
@@ -182,7 +204,9 @@ export class Game {
     }
     const cfg = ANIMATIONS[state];
     let ft = cfg.frameTime;
-    if (state === 'run') ft *= (D.baseSpeed / Math.max(this.speed, 1)) * (this.stamina <= 0 ? 1.25 : 1);
+    if (state === 'run') {
+      ft = Math.max(cfg.minFrameTime, ft * (D.baseSpeed / Math.max(this.speed, 1))) * (this.stamina <= 0 ? 1.2 : 1);
+    }
     a.t += h;
     while (a.t >= ft) {
       a.t -= ft;
@@ -204,21 +228,19 @@ export class Game {
     const p = this.player;
     const attract = this.mode === 'attract';
 
-    let target = attract ? 150 : this.targetSpeed();
+    let target = attract ? 110 : this.targetSpeed();
     if (!attract && this.boostT > 0) target *= BOOST.speedMult;
     if (!attract && this.stamina <= 0) target *= STAMINA.exhaustedSpeedMult;
     this.speed += (target - this.speed) * Math.min(1, h * 5);
     this.traveled += this.speed * h;
     this.meters = this.traveled * METERS_PER_PX;
-    p.phase += h * (7 + this.speed / 50) * (this.stamina <= 0 ? 0.8 : 1);
+    p.phase += h * (6 + this.speed / 40);
 
     this.updateZone(h, attract);
     this.updateProps(h);
     this.updateFx(h);
-    if (attract) {
-      this.updateAnim(h);
-      return;
-    }
+    this.updateAnim(h);
+    if (attract) return;
 
     this.t += h;
     this.paceSum += this.pace * h;
@@ -227,7 +249,7 @@ export class Game {
     const before = this.stamina;
     this.stamina = Math.max(0, this.stamina - STAMINA.drainPerSec * (this.boostT > 0 ? STAMINA.boostDrainMult : 1) * h);
     if (before > 0 && this.stamina === 0) {
-      this.emit('callout', { text: 'BONK! LEGS LEFT THE GROUP CHAT.', kind: 'bad' });
+      this.say('Crisi! Le gambe hanno abbandonato il gruppo WhatsApp.', 'bad', PRIO.high);
       this.emit('sfx', 'bonk');
     }
 
@@ -257,7 +279,6 @@ export class Game {
         }
       }
     }
-    this.updateAnim(h);
     if (p.slideT > 0) {
       p.slideT -= h;
       // Keep sliding while held or still under a flyer: never stand up into it.
@@ -268,56 +289,78 @@ export class Game {
     // spawning
     if (this.traveled >= this.nextObstacleAt && this.meters < FINISH_M - D.finishClearM) this.spawnObstacle();
 
-    // movement
+    // movement: everything scrolls with the world, minus its own speed v
     for (const o of this.obstacles) {
-      o.x -= (this.speed + (o.extra || 0)) * h;
+      o.x -= (this.speed - o.v) * h;
+      o.anim += h;
       if (o.knocked) o.knockT += h;
     }
     for (const it of this.items) {
-      it.x -= (this.speed + (it.extra || 0)) * h;
-      it.bob += h * 5;
+      it.x -= (this.speed - it.v) * h;
+      it.bob += h * 4;
     }
-    for (const o of this.obstacles) o.anim += h;
-    this.obstacles = this.obstacles.filter((o) => o.x > -80);
-    this.items = this.items.filter((it) => it.x > -30 && !it.taken);
 
-    // hints the first time each obstacle family appears
+    // hints the first time each obstacle family shows up
     for (const o of this.obstacles) {
-      const kind = OBSTACLES[o.type].fly ? 'slide' : 'jump';
-      if (!this.hintsShown[kind] && o.x < W - 60) {
+      const kind = o.type === 'runclub' ? 'club' : OBSTACLES[o.type].fly ? 'slide' : 'jump';
+      if (!this.hintsShown[kind] && o.x < W - 40) {
         this.hintsShown[kind] = true;
-        this.emit('callout', {
-          text: kind === 'slide' ? 'SLIDE UNDER IT! ↓ / S / TAP RIGHT' : 'JUMP! SPACE / ↑ / TAP LEFT',
-          kind: 'info',
-        });
+        const text = {
+          jump: 'Salta! SPAZIO / ↑ / tocca a sinistra',
+          slide: 'Scivola sotto! ↓ / S / tocca a destra',
+          club: 'Run club! Salta solo chi corre nella tua corsia',
+        }[kind];
+        this.say(text, 'info', PRIO.high);
       }
     }
 
     // collisions
     const pr = this.playerRect();
     for (const o of this.obstacles) {
-      if (!o.hit && overlap(pr, this.obstacleBox(o))) this.onHit(o);
+      if (!o.hit && this.obstacleBoxes(o).some((b) => overlap(pr, b))) this.onHit(o);
       if (this.mode !== 'run') return;
     }
     for (const it of this.items) {
-      if (!it.taken && overlap(pr, { x: it.x - 8, y: it.y - 8, w: 16, h: 16 })) this.collect(it);
+      if (!it.taken && overlap(pr, { x: it.x - 9, y: it.y - 9, w: 18, h: 18 })) this.collect(it);
     }
+
+    // overtaken groups: bonus + joke
+    for (const o of this.obstacles) {
+      if (!o.members || o.passed || o.x + o.laneEnd >= PLAYER_X - 12) continue;
+      o.passed = true;
+      if (o.hit) continue;
+      if (o.type === 'runclub') {
+        this.itemScore += RUN_CLUB.passBonus;
+        this.kudos += RUN_CLUB.passKudos;
+        this.texts.push({ x: PLAYER_X + 24, y: GROUND_Y - 58, text: `+${RUN_CLUB.passBonus} SORPASSO`, life: 1.2, color: C.lime });
+        this.say(joke('runclub'), 'good', PRIO.normal);
+        this.addBrainrot(RUN_CLUB.passBrainrot);
+      } else if (Math.random() < 0.4) {
+        this.say(joke('nonna'), 'good', PRIO.low);
+      }
+    }
+    this.obstacles = this.obstacles.filter((o) => o.x + (o.span || o.w) > -60);
+    this.items = this.items.filter((it) => it.x > -30 && !it.taken);
 
     // social feed
     if (this.meters >= this.nextKm * 1000 && this.nextKm < FINISH_M / 1000) {
-      this.emit('toast', { title: `KM ${this.nextKm} SPLIT`, body: `${formatPace(this.pace)} /km. Your watch beeped judgmentally.` });
+      this.emit('toast', { title: `SPLIT KM ${this.nextKm}`, body: `${formatPace(this.pace)}/km. L'orologio ha vibrato con disapprovazione.` });
       this.nextKm++;
     }
     this.feedT -= h;
     if (this.feedT <= 0) {
-      this.feedT = rand(9, 14);
-      const club = Math.random() < 0.4;
-      this.emit('toast', { title: club ? 'RUN CLUB GROUP CHAT' : 'ACTIVITY FEED', body: pick(club ? CLUB : FEED) });
+      this.feedT = rand(12, 18);
+      if (this.level >= 3 && Math.random() < 0.4) {
+        this.say(joke('brainrot'), 'good', PRIO.low);
+      } else {
+        const club = Math.random() < 0.4;
+        this.emit('toast', { title: club ? 'CHAT DEL RUN CLUB' : 'FEED ATTIVITÀ', body: joke(club ? 'club' : 'feed') });
+      }
     }
     if (this.level >= 5) {
       this.memeT -= h;
       if (this.memeT <= 0) {
-        this.memeT = rand(5, 8);
+        this.memeT = rand(8, 12);
         this.memeEffect();
       }
     }
@@ -333,7 +376,7 @@ export class Game {
       this.prevZone = this.zone;
       this.zone = z;
       this.zoneBlend = 0;
-      if (!attract) this.emit('toast', { title: 'NOW ENTERING', body: `${ZONES[z].name}. Segment hunting enabled.` });
+      if (!attract) this.emit('toast', { title: 'NUOVA ZONA', body: `${ZONES[z].name}. Caccia ai segmenti aperta.` });
     }
     this.zoneBlend = Math.min(1, this.zoneBlend + h / 1.2);
   }
@@ -358,7 +401,7 @@ export class Game {
     }
     this.particles = this.particles.filter((pt) => pt.life > 0);
     for (const tx of this.texts) {
-      tx.y -= 28 * h;
+      tx.y -= 24 * h;
       tx.life -= h;
     }
     this.texts = this.texts.filter((tx) => tx.life > 0);
@@ -377,15 +420,27 @@ export class Game {
     return avail[0][0];
   }
 
-  scheduleNext(afterW) {
+  // Schedules the next spawn after obstacle `o` (just spawned at x = W + 20).
+  scheduleNext(o) {
     const type = this.pickType();
+    const S = this.targetSpeed(); // un-boosted, so gaps stay fair once a boost ends
     const prog = clamp(this.meters / D.rampMeters, 0, 1);
     const secs = Math.max(D.minGapSeconds, lerp(D.gapStart, D.gapEnd, prog) - (this.level - 1) * D.gapPerLevel)
       * (1 + Math.random() * D.gapJitter);
-    // Gap uses the un-boosted speed so it stays fair once the boost ends.
-    let gap = this.targetSpeed() * secs + afterW;
+    const span = o.span || o.w;
+    let gap = S * secs + span;
+    if (o.v > 0) {
+      // Slower than the world (run club, grannies): the next obstacle must not catch up with
+      // them before they are past the runner, plus the usual reaction time.
+      const tailArrives = (o.x + span - PLAYER_X) / (S - o.v);
+      gap = Math.max(gap, S * (tailArrives + secs) - (W + 20 - PLAYER_X));
+    }
+    // Something walking/flying towards the runner arrives early: give that time back.
+    const towards = type === 'nonna' ? NONNA.walkSpeed : Math.max(0, -(OBSTACLES[type].v || 0));
+    gap += ((W + 20 - PLAYER_X) * towards) / S;
     gap += OBSTACLES[type].extraGap || 0;
-    if (this.prevType && OBSTACLES[this.prevType].fly) gap += OBSTACLES[this.prevType].extraGap;
+    if (OBSTACLES[o.type].fly) gap += OBSTACLES[o.type].extraGap;
+    if (OBSTACLES[type].group) gap += 30;
     this.nextType = type;
     this.nextObstacleAt = this.traveled + gap;
     return gap;
@@ -394,25 +449,66 @@ export class Game {
   spawnObstacle() {
     const type = this.nextType;
     const cfg = OBSTACLES[type];
-    const o = { type, x: W + 20, w: cfg.w, extra: cfg.extraSpeed || 0, hit: false, knocked: false, knockT: 0, anim: Math.random() * 10 };
+    const base = { type, x: W + 20, v: cfg.v || 0, w: cfg.w || 0, hit: false, knocked: false, knockT: 0, anim: Math.random() * 10 };
+    const o = type === 'runclub' ? this.makeRunClub(base) : type === 'nonna' ? this.makeNonna(base) : base;
     this.obstacles.push(o);
-    this.prevType = type;
 
-    // Reward over/under the obstacle: kudos follow the path you need to take anyway.
-    if (cfg.fly) {
-      if (Math.random() < 0.7) for (let i = -1; i <= 1; i++) this.addItem('kudos', o.x + o.w / 2 + i * 14, GROUND_Y - 9, o.extra);
-    } else if (Math.random() < 0.5) {
+    // Rewards along the path you have to take anyway.
+    if (type === 'runclub') {
+      for (const m of o.members) if (m.lane === 'front') this.addItem('kudos', o.x + m.dx, GROUND_Y - 58, o.v);
+    } else if (cfg.fly) {
+      if (Math.random() < 0.7) for (let i = -1; i <= 1; i++) this.addItem('kudos', o.x + o.w / 2 + i * 14, GROUND_Y - 9, o.v);
+    } else if (!cfg.group && Math.random() < 0.5) {
       const cx = o.x + o.w / 2;
-      [[-16, 50], [0, 62], [16, 50]].forEach(([dx, dy]) => this.addItem('kudos', cx + dx, GROUND_Y - dy, o.extra));
+      [[-16, 50], [0, 62], [16, 50]].forEach(([dx, dy]) => this.addItem('kudos', cx + dx, GROUND_Y - dy, o.v));
     }
 
-    const gap = this.scheduleNext(o.w);
+    const gap = this.scheduleNext(o);
+    // Gap items only between static/fast obstacles: slow groups would drift through them.
+    if (cfg.group || OBSTACLES[this.nextType].group) return;
     const mid = o.x + o.w + (gap - o.w) / 2;
     if (Math.random() < 0.65) {
-      this.addItem(this.nextBagItem(), mid, GROUND_Y - 12);
+      this.addItem(this.nextBagItem(), mid, GROUND_Y - 13);
     } else if (Math.random() < 0.6) {
-      for (let i = -1; i <= 1; i++) this.addItem('kudos', mid + i * 16, GROUND_Y - 12);
+      for (let i = -1; i <= 1; i++) this.addItem('kudos', mid + i * 16, GROUND_Y - 13);
     }
+  }
+
+  makeRunClub(o) {
+    const S = this.targetSpeed();
+    o.v = S * rand(...RUN_CLUB.speedFactor);
+    // Worst-case relative speed by the time they arrive (speed creep, boost), with margin.
+    const rel = (Math.min(D.maxSpeed, S * 1.1) - o.v) * BOOST.speedMult;
+    const looks = [...RUN_CLUB.looks].sort(() => Math.random() - 0.5);
+    const total = randInt(...RUN_CLUB.size);
+    const inLane = Math.min(total, randInt(...RUN_CLUB.inLane));
+    const members = [];
+    let dx = 0;
+    for (let i = 0; i < inLane; i++) {
+      members.push({ dx, lane: 'front', w: RUN_CLUB.memberW, h: RUN_CLUB.memberH, look: looks[i], phase: rand(0, 6), scale: rand(0.96, 1.04) });
+      // Room to land and jump again: one airtime of relative travel + both bodies + slack.
+      dx += rel * (P.jumpVelocity * 2 / P.gravity) + RUN_CLUB.memberW + P.standW + RUN_CLUB.laneGapMin + rand(0, 25);
+    }
+    const laneEnd = members[members.length - 1].dx + RUN_CLUB.memberW / 2;
+    for (let i = inLane; i < total; i++) {
+      members.push({ dx: rand(-18, laneEnd + 18), lane: 'back', w: RUN_CLUB.memberW, h: RUN_CLUB.memberH, look: looks[i % looks.length], phase: rand(0, 6), scale: rand(0.84, 0.9) });
+    }
+    return Object.assign(o, { members, laneEnd, span: laneEnd + 24, w: RUN_CLUB.memberW });
+  }
+
+  makeNonna(o) {
+    const variant = pick(['bag', 'cart', 'pair', 'cross']);
+    const towards = variant !== 'cross' && Math.random() < 0.35;
+    o.v = towards ? -NONNA.walkSpeed : NONNA.walkSpeed;
+    const facing = towards ? -1 : 1;
+    const look = pick(NONNA.looks);
+    const prop = variant === 'cart' ? 'cart' : 'bag';
+    const w = prop === 'cart' ? 30 : 20;
+    const members = [{ dx: 0, lane: 'front', w, h: NONNA.boxH, look, prop, facing, cross: variant === 'cross' }];
+    if (variant === 'pair') {
+      members.push({ dx: 10, lane: 'back', w: 20, h: NONNA.boxH, look: pick(NONNA.looks.filter((l) => l !== look)), prop: 'bag', facing });
+    }
+    return Object.assign(o, { members, laneEnd: w / 2, span: w / 2 + 14, w });
   }
 
   nextBagItem() {
@@ -429,8 +525,8 @@ export class Game {
     return next === 'health' && this.lives >= 3 ? 'exp' : next;
   }
 
-  addItem(type, x, y, extra = 0) {
-    this.items.push({ type, x, y, extra, sprite: pick(ITEMS[type].sprites), bob: Math.random() * 6, taken: false });
+  addItem(type, x, y, v = 0) {
+    this.items.push({ type, x, y, v, sprite: pick(ITEMS[type].sprites), bob: Math.random() * 6, taken: false });
   }
 
   // ---------- events ----------
@@ -439,8 +535,8 @@ export class Game {
     if (this.boostT > 0) {
       o.hit = true;
       o.knocked = true;
-      this.burst(o.x + o.w / 2, GROUND_Y - 12, [C.orange, C.lime, C.cream], 14, 160);
-      this.emit('callout', { text: 'SUGAR RUSH! OBSTACLE DELETED.', kind: 'good' });
+      this.burst(o.x + (o.w || 20) / 2, GROUND_Y - 12, [C.orange, C.lime, C.cream], 14, 160);
+      this.say('Turbo zuccherino! Ostacolo eliminato.', 'good', PRIO.normal);
       this.emit('sfx', 'smash');
       return;
     }
@@ -454,7 +550,7 @@ export class Game {
     this.flash = 0.25;
     this.flashColor = C.red;
     this.burst(PLAYER_X, p.y - 16, [C.red, C.cream, C.orange], 16, 150);
-    this.emit('callout', { text: pick(HIT_REACTIONS[o.type]), kind: 'bad' });
+    this.say(o.type === 'nonna' ? joke('nonna') : pick(HIT_REACTIONS[o.type]), 'bad', PRIO.high);
     this.emit('sfx', 'hit');
     if (this.lives <= 0) this.end(false);
   }
@@ -484,30 +580,29 @@ export class Game {
     if (cfg.life) {
       if (this.lives < 3) {
         this.lives++;
-        label = '+1 LIFE';
+        label = '+1 VITA';
       } else {
         this.itemScore += 100;
         label = '+100';
       }
     }
-    if (it.type === 'water') label = `+${cfg.stamina} STAMINA`;
-    if (it.type === 'bib') label = `x${SCORING.multiplier} SCORE`;
+    if (it.type === 'water') label = `+${cfg.stamina} ENERGIA`;
+    if (it.type === 'bib') label = `PUNTI x${SCORING.multiplier}`;
     if (it.type === 'brainrot') label = '+BRAINROT';
-    this.texts.push({ x: it.x, y: it.y - 10, text: label, life: 0.9, color: it.type === 'kudos' ? C.orange : C.lime });
+    this.texts.push({ x: it.x, y: it.y - 10, text: label, life: 1.1, color: it.type === 'kudos' ? C.gold : C.lime });
     this.burst(it.x, it.y, ITEM_COLORS[it.type], it.type === 'kudos' ? 6 : 12, 110);
     this.emit('sfx', it.type === 'kudos' ? 'kudos' : 'pickup');
 
     if (it.type === 'kudos') {
       if (this.firstKudos) {
         this.firstKudos = false;
-        this.emit('toast', { title: 'ACTIVITY FEED', body: 'Someone gave you 1 kudos. You can sleep now.' });
-      }
-      if (this.kudosQuoteT <= 0) {
-        this.kudosQuoteT = 8;
-        this.emit('callout', { text: cfg.quote, kind: 'good' });
+        this.emit('toast', { title: 'FEED ATTIVITÀ', body: 'Qualcuno ti ha dato 1 kudos. Ora puoi dormire.' });
+      } else if (this.kudosQuoteT <= 0) {
+        this.kudosQuoteT = 14;
+        this.say(joke('kudos'), 'good', PRIO.low);
       }
     } else {
-      this.emit('callout', { text: cfg.quote, kind: 'good' });
+      this.say(joke(cfg.jokes), 'good', PRIO.normal);
     }
     this.addBrainrot(cfg.brainrot);
   }
@@ -531,11 +626,13 @@ export class Game {
     const r = Math.random();
     if (r < 0.25) {
       this.confetti(this.reducedMotion ? 8 : 30);
-      this.emit('callout', { text: 'NEW PB? (PROBABLY NOT)', kind: 'level' });
+      this.say('NUOVO PB? (Probabilmente no)', 'level', PRIO.low);
     } else if (r < 0.4) {
-      this.emit('callout', { text: `PACE CHECK: ${formatPace(this.pace)}/KM. SUSPICIOUS.`, kind: 'info' });
+      this.say(`Controllo pace: ${formatPace(this.pace)}/km. Sospetto.`, 'info', PRIO.low);
+    } else if (r < 0.65) {
+      this.say(joke('brainrot'), 'good', PRIO.low);
     } else {
-      this.emit('toast', pick(MEMES));
+      this.emit('toast', joke('memes'));
     }
   }
 
@@ -547,6 +644,7 @@ export class Game {
       this.finishBonus = SCORING.finishBonus + this.lives * SCORING.lifeBonus;
       this.confetti(this.reducedMotion ? 10 : 60);
     }
+    const peak = LEVELS[this.maxLevel - 1];
     this.result = {
       finished,
       score: this.score,
@@ -556,9 +654,9 @@ export class Game {
       kudos: this.kudos,
       shoes: this.shoes,
       maxLevel: this.maxLevel,
-      maxLevelTitle: LEVELS[this.maxLevel - 1].title,
-      maxLevelRank: LEVELS[this.maxLevel - 1].rank,
-      maxLevelVariant: LEVELS[this.maxLevel - 1].variant,
+      maxLevelTitle: peak.title,
+      maxLevelRank: peak.rank,
+      maxLevelVariant: peak.variant,
       lives: this.lives,
     };
     this.emit('sfx', finished ? 'finish' : 'gameover');

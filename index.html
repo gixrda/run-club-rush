@@ -1,37 +1,37 @@
 <!doctype html>
-<html lang="en">
+<html lang="it">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#0B1630" />
-    <title>Strava Brainrot</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 fill=%22%23172B4D%22/%3E%3Crect x=%222%22 y=%229%22 width=%2212%22 height=%224%22 fill=%22%23D5FF52%22/%3E%3Crect x=%222%22 y=%224%22 width=%225%22 height=%225%22 fill=%22%23FF6B35%22/%3E%3C/svg%3E" />
-    <meta name="description" content="A running game for people who need help." />
+    <meta name="theme-color" content="#05080E" />
+    <title>Run Club Rush</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 rx=%223%22 fill=%22%23172B4D%22/%3E%3Crect x=%222%22 y=%229%22 width=%2212%22 height=%224%22 rx=%221%22 fill=%22%23D5FF52%22/%3E%3Ccircle cx=%225%22 cy=%226%22 r=%223%22 fill=%22%23FF6B35%22/%3E%3C/svg%3E" />
+    <meta name="description" content="Un gioco di corsa per chi ha bisogno di aiuto." />
   </head>
   <body>
     <main id="app">
       <header id="hud" class="hud" hidden>
         <div class="hud-row">
-          <div class="stat"><span class="label">DIST</span><span class="value" id="h-dist">0.00 km</span></div>
-          <div class="stat"><span class="label">TIME</span><span class="value" id="h-time">0:00</span></div>
-          <div class="stat"><span class="label"><img class="icon" data-sprite="ui/speed" alt="" hidden />PACE</span><span class="value" id="h-pace">5:30/km</span></div>
-          <div class="stat"><span class="label">SCORE</span><span class="value" id="h-score">0</span></div>
+          <div class="stat"><span class="label">DISTANZA</span><span class="value" id="h-dist">0,00 km</span></div>
+          <div class="stat"><span class="label">TEMPO</span><span class="value" id="h-time">0:00</span></div>
+          <div class="stat"><span class="label"><img class="icon" data-sprite="ui/speed" alt="" hidden />PACE</span><span class="value" id="h-pace">6:00/km</span></div>
+          <div class="stat"><span class="label">PUNTI</span><span class="value" id="h-score">0</span></div>
           <div class="stat"><span class="label">KUDOS</span><span class="value" id="h-kudos">0</span></div>
-          <div class="stat"><span class="label">LIVES</span><span class="value lives" id="h-lives" role="img" aria-label="3 lives"><span class="lives-text" id="h-lives-text">♥♥♥</span><img class="life" data-sprite="ui/health" alt="" hidden /><img class="life" data-sprite="ui/health" alt="" hidden /><img class="life" data-sprite="ui/health" alt="" hidden /></span></div>
+          <div class="stat"><span class="label">VITE</span><span class="value lives" id="h-lives" role="img" aria-label="3 vite su 3"><span class="lives-text" id="h-lives-text">♥♥♥</span><img class="life" data-sprite="ui/health" alt="" hidden /><img class="life" data-sprite="ui/health" alt="" hidden /><img class="life" data-sprite="ui/health" alt="" hidden /></span></div>
           <div class="hud-actions">
-            <button class="btn btn-small" id="btn-pause" type="button">PAUSE</button>
-            <button class="btn btn-small" id="btn-mute" type="button">SOUND ON</button>
+            <button class="btn btn-small" id="btn-pause" type="button">PAUSA</button>
+            <button class="btn btn-small" id="btn-mute" type="button" aria-pressed="true">AUDIO: SÌ</button>
           </div>
         </div>
         <div class="hud-row">
           <div class="meter" id="m-stamina">
-            <span class="label"><img class="icon" data-sprite="ui/hydration" alt="" hidden />STAMINA <b id="h-stamina">100</b></span>
+            <span class="label"><img class="icon" data-sprite="ui/hydration" alt="" hidden />ENERGIA <b id="h-stamina">100</b></span>
             <div class="bar"><div class="fill" id="f-stamina"></div></div>
           </div>
           <div class="meter meter-brainrot" id="m-brainrot">
             <img class="portrait" id="h-variant" data-sprite="runner/lv1" alt="" hidden />
             <div class="meter-body">
-              <span class="label"><img class="icon" data-sprite="ui/brainrot" alt="" hidden />BRAINROT LV <b id="h-level">1</b>/5 · <b id="h-title">CASUAL RUNNER</b></span>
+              <span class="label"><img class="icon" data-sprite="ui/brainrot" alt="" hidden />BRAINROT LV <b id="h-level">1</b>/5 · <b id="h-title">RUNNER DELLA DOMENICA</b></span>
               <div class="bar"><div class="fill" id="f-brainrot"></div></div>
             </div>
           </div>
@@ -40,74 +40,78 @@
       </header>
 
       <div id="play">
-        <button class="pad" id="pad-jump" type="button" aria-label="Jump">JUMP</button>
+        <button class="pad" id="pad-jump" type="button" aria-label="Salta">SALTA</button>
         <div id="stage">
-          <canvas id="game" width="960" height="540" aria-label="Strava Brainrot game area"></canvas>
+          <canvas id="game" width="960" height="540" aria-label="Area di gioco di Run Club Rush"></canvas>
+          <div id="callout" role="status" aria-live="polite"></div>
           <div id="tags" class="hud-tags">
             <span class="tag" id="t-combo" hidden></span>
             <span class="tag" id="t-mult" hidden></span>
-            <span class="tag" id="t-boost" hidden><img class="icon" data-sprite="ui/energy" alt="" hidden />SUGAR RUSH</span>
-            <span class="tag tag-bad" id="t-bonk" hidden>BONKED · SLOWER</span>
+            <span class="tag" id="t-boost" hidden><img class="icon" data-sprite="ui/energy" alt="" hidden />TURBO</span>
+            <span class="tag tag-bad" id="t-bonk" hidden>IN CRISI · PIÙ LENTO</span>
           </div>
-          <div id="feed" aria-live="polite"></div>
-          <div id="callout" role="status"></div>
         </div>
-        <button class="pad" id="pad-slide" type="button" aria-label="Slide">SLIDE</button>
+        <button class="pad" id="pad-slide" type="button" aria-label="Scivola">SCIVOLA</button>
       </div>
     </main>
 
-    <section class="screen" id="screen-title" aria-labelledby="logo">
-      <div class="panel panel-title">
-        <div class="title-hero">
+    <section class="screen screen-home" id="screen-title" aria-labelledby="title-heading">
+      <div class="title-card">
+        <h1 id="title-heading" class="sr-only">Run Club Rush</h1>
+        <img id="logo-img" class="logo-img" src="/assets/logo_runclubrush-web.jpg" alt="Run Club Rush" width="1100" height="726" />
+        <div class="title-body">
           <img class="hero-runner" data-sprite="runner/idle" alt="" hidden />
-          <h1 id="logo" class="logo"><span class="logo-a">STRAVA</span><span class="logo-b">BRAINROT</span></h1>
+          <div class="title-cta">
+            <p class="tagline">Un'altra easy run finita fuori soglia.</p>
+            <button class="btn btn-primary btn-big" id="btn-play" type="button" disabled>INIZIA A CORRERE</button>
+            <div class="loading" id="loading" role="status" aria-live="polite">
+              <div class="progress" aria-hidden="true"><div class="progress-fill" id="load-fill"></div></div>
+              <p class="loading-text" id="load-text">Allacciamo le carbon...</p>
+            </div>
+            <p class="records">RECORD PERSONALE <b id="r-score">0</b> · CORSA PIÙ LUNGA <b id="r-dist">0,00 km</b></p>
+            <p class="controls-hint">SPAZIO / ↑ per saltare · ↓ per scivolare · Esc per la pausa</p>
+            <p class="controls-hint touch-hint">Su telefono: tocca a sinistra per saltare, a destra per scivolare</p>
+            <button class="btn btn-small" id="btn-mute-title" type="button" aria-pressed="true">AUDIO: SÌ</button>
+            <p class="asset-warning" id="asset-warning" role="alert" hidden></p>
+          </div>
         </div>
-        <p class="subtitle">A running game for people who need help.</p>
-        <button class="btn btn-primary btn-big" id="btn-play" type="button">PLAY</button>
-        <p class="records">BEST SCORE <b id="r-score">0</b> · LONGEST RUN <b id="r-dist">0.00 km</b></p>
-        <dl class="controls">
-          <dt>JUMP</dt><dd>Space / ↑ / W · tap left half</dd>
-          <dt>SLIDE</dt><dd>↓ / S · tap right half</dd>
-          <dt>PAUSE</dt><dd>Esc / P</dd>
-          <dt>SOUND</dt><dd>M</dd>
-        </dl>
-        <p class="fineprint">Reach 5K or lose 3 lives. Fictional parody, not affiliated with any app.</p>
+        <p class="fineprint">Parodia di fantasia. Nessun legame con Strava o HYROX.</p>
       </div>
     </section>
 
     <section class="screen" id="screen-pause" aria-labelledby="pause-title" hidden>
       <div class="panel">
-        <h2 id="pause-title" class="screen-title">PAUSED</h2>
-        <p class="subtitle">Auto-pause enabled. Your average pace is safe.</p>
+        <h2 id="pause-title" class="screen-title">IN PAUSA</h2>
+        <p class="subtitle">Auto-pausa attiva. Il tuo pace medio è salvo.</p>
         <div class="actions">
-          <button class="btn btn-primary" id="btn-resume" type="button">RESUME</button>
-          <button class="btn" id="btn-restart" type="button">RESTART</button>
-          <button class="btn" id="btn-title-from-pause" type="button">TITLE</button>
+          <button class="btn btn-primary" id="btn-resume" type="button">RIPRENDI</button>
+          <button class="btn" id="btn-restart" type="button">RICOMINCIA</button>
+          <button class="btn" id="btn-title-from-pause" type="button">MENU INIZIALE</button>
         </div>
       </div>
     </section>
 
     <section class="screen" id="screen-over" aria-labelledby="over-title" hidden>
       <div class="panel">
-        <h2 id="over-title" class="screen-title">DNF</h2>
-        <p class="pb-badge" id="o-pb" hidden>NEW PERSONAL BEST</p>
+        <h2 id="over-title" class="screen-title">FINE CORSA</h2>
+        <p class="pb-badge" id="o-pb" hidden>NUOVO PB!</p>
         <p class="message" id="o-msg"></p>
         <div class="activity">
-          <p class="activity-head"><b id="o-name">Morning Run</b> · uploaded just now</p>
+          <p class="activity-head"><b id="o-name">Corsa mattutina</b> · caricata ora</p>
           <dl class="activity-stats">
-            <div><dt>SCORE</dt><dd id="o-score">0</dd></div>
-            <div><dt>DISTANCE</dt><dd id="o-dist">0.00 km</dd></div>
-            <div><dt>TIME</dt><dd id="o-time">0:00</dd></div>
-            <div><dt>AVG PACE</dt><dd id="o-pace">-</dd></div>
+            <div><dt>PUNTI</dt><dd id="o-score">0</dd></div>
+            <div><dt>DISTANZA</dt><dd id="o-dist">0,00 km</dd></div>
+            <div><dt>TEMPO</dt><dd id="o-time">0:00</dd></div>
+            <div><dt>PACE MEDIO</dt><dd id="o-pace">-</dd></div>
             <div><dt>KUDOS</dt><dd id="o-kudos">0</dd></div>
-            <div><dt>SHOES</dt><dd id="o-shoes">0</dd></div>
-            <div class="wide peak"><img class="portrait" id="o-variant" data-sprite="runner/lv1" alt="" hidden /><div><dt>PEAK BRAINROT</dt><dd id="o-level">LV 1 · CASUAL RUNNER</dd></div></div>
-            <div class="wide"><dt>BEST SCORE</dt><dd id="o-best">0</dd></div>
+            <div><dt>SCARPE</dt><dd id="o-shoes">0</dd></div>
+            <div class="wide peak"><img class="portrait" id="o-variant" data-sprite="runner/lv1" alt="" hidden /><div><dt>BRAINROT MASSIMO</dt><dd id="o-level">LV 1</dd></div></div>
+            <div class="wide"><dt>RECORD PERSONALE</dt><dd id="o-best">0</dd></div>
           </dl>
         </div>
         <div class="actions">
-          <button class="btn btn-primary" id="btn-retry" type="button">RETRY</button>
-          <button class="btn" id="btn-title-from-over" type="button">TITLE</button>
+          <button class="btn btn-primary" id="btn-retry" type="button">RITENTA</button>
+          <button class="btn" id="btn-title-from-over" type="button">MENU INIZIALE</button>
         </div>
       </div>
     </section>

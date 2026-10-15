@@ -1,13 +1,12 @@
 import './styles.css';
 import { Game } from './game.js';
 import { createRenderer } from './render.js';
-import { loadSprites } from './sprites.js';
+import { loadAssets, LOGO_FALLBACK_SRC } from './sprites.js';
 import { initAudio, setMuted as setAudioMuted, sfx } from './audio.js';
+import { joke } from './jokes.js';
 import * as ui from './ui.js';
-import { DNF_MESSAGES, FINISH_MESSAGES } from './config.js';
 
 const $ = (id) => document.getElementById(id);
-const pick = (arr) => arr[(Math.random() * arr.length) | 0];
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // ---------- persistence (storage may be unavailable: private mode, blocked site data) ----------
@@ -29,8 +28,9 @@ function save() {
 const store = load();
 
 // ---------- game wiring ----------
-let state = 'loading'; // loading | title | playing | paused | over
-let renderer = null; // created once the sprite sheet assets are loaded
+let state = 'loading'; // loading | title | starting | playing | paused | over
+let renderer = null; // created once the assets are loaded
+const canvas = $('game');
 const game = new Game(onEvent, reducedMotion);
 if (import.meta.env.DEV) window.__game = game; // debugging / smoke tests only
 
@@ -38,7 +38,7 @@ function onEvent(type, data) {
   if (state !== 'playing') return;
   switch (type) {
     case 'sfx': sfx(data); break;
-    case 'callout': ui.callout(data.text, data.kind); break;
+    case 'callout': ui.notify(data); break;
     case 'toast': ui.toast(data); break;
     case 'levelup': ui.levelUp(data); break;
     case 'gameover': gameOver(data); break;
@@ -53,22 +53,32 @@ function gameOver(result) {
   store.bestDistance = Math.max(store.bestDistance, result.meters);
   save();
   ui.setRecords(store);
-  const message = pick(result.finished ? FINISH_MESSAGES : DNF_MESSAGES);
+  const message = joke(result.finished ? 'finish' : 'dnf');
   // Brief beat so the crash/finish registers before the results cover the scene.
   setTimeout(() => {
     if (state === 'over') ui.showResults(result, store, isPB, message);
   }, 700);
 }
 
-function start() {
-  if (state === 'loading') return;
-  initAudio();
+function beginRun() {
   game.reset();
   ui.clearTransient();
   state = 'playing';
   ui.showScreen(null);
   document.activeElement?.blur();
   last = performance.now();
+}
+
+function start() {
+  if (state === 'loading' || state === 'starting' || state === 'playing') return;
+  initAudio();
+  if (state === 'title' && !reducedMotion) {
+    // Short fade from the title screen into the run; the attract scene keeps moving meanwhile.
+    state = 'starting';
+    ui.leaveTitle(260, beginRun);
+  } else {
+    beginRun();
+  }
 }
 
 function pause() {
@@ -96,13 +106,7 @@ function toTitle() {
 
 function toggleMute() {
   store.muted = !store.muted;
-  // Keep HUD + stage inside the viewport: the stage width is derived from the real HUD height.
-new ResizeObserver(() => {
-  const hud = $('hud');
-  document.documentElement.style.setProperty('--hud-h', `${hud.hidden ? 0 : hud.offsetHeight}px`);
-}).observe($('hud'));
-
-setAudioMuted(store.muted);
+  setAudioMuted(store.muted);
   ui.setMuted(store.muted);
   save();
 }
@@ -139,7 +143,7 @@ window.addEventListener('keydown', (e) => {
     if (state === 'title' || (state === 'over' && ui.currentScreen === 'over')) start();
     else if (state === 'paused') resume();
   }
-  if (e.code.startsWith('Arrow') && state !== 'title' && state !== 'over' && state !== 'paused') e.preventDefault();
+  if (e.code.startsWith('Arrow') && state === 'playing') e.preventDefault();
 });
 
 window.addEventListener('keyup', (e) => {
@@ -147,7 +151,6 @@ window.addEventListener('keyup', (e) => {
 });
 
 // Touch / mouse on the canvas: left half jumps, right half slides (hold to keep sliding).
-const canvas = $('game');
 let slidePointer = null;
 canvas.addEventListener('pointerdown', (e) => {
   if (state !== 'playing') return;
@@ -193,17 +196,43 @@ $('btn-pause').addEventListener('click', (e) => {
   e.currentTarget.blur();
   pause();
 });
-$('btn-mute').addEventListener('click', (e) => {
-  e.currentTarget.blur();
-  initAudio();
-  toggleMute();
-});
+for (const id of ['btn-mute', 'btn-mute-title']) {
+  $(id).addEventListener('click', (e) => {
+    if (id === 'btn-mute') e.currentTarget.blur();
+    initAudio();
+    toggleMute();
+  });
+}
+// Original logo if the trimmed web copy is missing.
+$('logo-img').addEventListener('error', (e) => {
+  e.currentTarget.src = LOGO_FALLBACK_SRC;
+}, { once: true });
 
 // Pause when the tab is hidden or the window loses focus; never lose lives in the background.
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) pause();
 });
 window.addEventListener('blur', pause);
+
+// ---------- layout ----------
+// Keep HUD + stage inside the viewport: the stage width is derived from the real HUD height.
+new ResizeObserver(() => {
+  const hud = $('hud');
+  document.documentElement.style.setProperty('--hud-h', `${hud.hidden ? 0 : hud.offsetHeight}px`);
+}).observe($('hud'));
+
+// Render at device resolution so sprites and text stay sharp at any size.
+function fitCanvas() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const width = Math.max(480, Math.min(2560, Math.round(canvas.clientWidth * dpr)));
+  const height = Math.round((width * 270) / 480);
+  if (renderer && (canvas.width !== width || canvas.height !== height)) renderer.resize(width, height);
+  else if (!renderer) {
+    canvas.width = width;
+    canvas.height = height;
+  }
+}
+new ResizeObserver(fitCanvas).observe(canvas);
 
 // ---------- loop ----------
 let last = performance.now();
@@ -212,18 +241,15 @@ function frame(now) {
   const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
   last = now;
   if (renderer) {
-    if (state === 'playing' || state === 'title') game.update(dt);
+    if (state === 'playing' || state === 'title' || state === 'starting') game.update(dt);
     renderer.draw(game);
   }
-  if (state === 'playing') ui.updateHUD(game, store);
+  if (state === 'playing') {
+    ui.updateHUD(game, store);
+    ui.tickNotifications(dt, game.imminent);
+  }
   requestAnimationFrame(frame);
 }
-
-// Keep HUD + stage inside the viewport: the stage width is derived from the real HUD height.
-new ResizeObserver(() => {
-  const hud = $('hud');
-  document.documentElement.style.setProperty('--hud-h', `${hud.hidden ? 0 : hud.offsetHeight}px`);
-}).observe($('hud'));
 
 setAudioMuted(store.muted);
 ui.setMuted(store.muted);
@@ -231,17 +257,23 @@ ui.setRecords(store);
 ui.showScreen('title');
 requestAnimationFrame(frame);
 
-// Preload every sheet sprite before the first run; failures fall back to procedural art.
-const playBtn = $('btn-play');
-playBtn.disabled = true;
-playBtn.textContent = 'LOADING';
-loadSprites((done, total) => {
-  playBtn.textContent = `LOADING ${done}/${total}`;
+// ---------- loading: wait for logo + sprites, never block forever ----------
+const t0 = performance.now();
+let loadProgress = [0, 1];
+ui.setLoading(0, 1, joke('loading'));
+const phraseTimer = setInterval(() => ui.setLoading(...loadProgress, joke('loading')), 1400);
+loadAssets((done, total) => {
+  loadProgress = [done, total];
+  ui.setLoading(done, total);
 }).then((atlas) => {
-  renderer = createRenderer($('game'), atlas);
+  clearInterval(phraseTimer);
+  fitCanvas();
+  renderer = createRenderer(canvas, atlas);
   ui.applySprites(atlas.files);
-  state = 'title';
-  playBtn.disabled = false;
-  playBtn.textContent = 'PLAY';
-  playBtn.focus({ preventScroll: true });
+  // A fast load just flashes the bar; a slow one lets the last phrase be read.
+  const hold = performance.now() - t0 < 300 ? 0 : 250;
+  setTimeout(() => {
+    state = 'title';
+    ui.finishLoading({ logoOk: Boolean(atlas.logo), essentialMissing: atlas.essentialMissing, missingCount: atlas.missing.length });
+  }, hold);
 });
