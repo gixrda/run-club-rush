@@ -38,8 +38,13 @@ Code map:
 
 ## Deploy
 
-Static site on Cloudflare Pages, connected to this GitHub repo (every push to `main` redeploys):
-build command `npm ci && npm run check && npm run build`, output directory `dist`, Node from `.node-version`.
+Live: https://run-club-rush.pages.dev (Cloudflare Pages, project `run-club-rush`).
+
+```bash
+npx wrangler@4 login   # once, approve in the browser
+npm run deploy         # self-checks, production build, upload of dist/ to Pages
+```
+
 `public/_headers` ships the security headers (strict same-origin CSP, no framing, HSTS, nosniff,
 no referrer). The game has no backend, no third-party scripts and no network calls besides its own assets.
 
