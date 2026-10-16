@@ -36,6 +36,13 @@ Code map:
 - `src/audio.js` – synthesized sound effects
 - `src/main.js` – loop, input, loading flow
 
+## Deploy
+
+Static site on Cloudflare Pages, connected to this GitHub repo (every push to `main` redeploys):
+build command `npm ci && npm run check && npm run build`, output directory `dist`, Node from `.node-version`.
+`public/_headers` ships the security headers (strict same-origin CSP, no framing, HSTS, nosniff,
+no referrer). The game has no backend, no third-party scripts and no network calls besides its own assets.
+
 ## Assets
 
 - `public/assets/logo_runclubrush.png` – official logo, untouched. `tools/prepare_logo.py` writes
