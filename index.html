@@ -18,6 +18,7 @@
           <div class="stat"><span class="label">PUNTI</span><span class="value" id="h-score">0</span></div>
           <div class="stat"><span class="label">KUDOS</span><span class="value" id="h-kudos">0</span></div>
           <div class="stat"><span class="label">VITE</span><span class="value lives" id="h-lives" role="img" aria-label="3 vite su 3"><span class="lives-text" id="h-lives-text">♥♥♥</span><img class="life" data-sprite="ui/health" alt="" hidden /><img class="life" data-sprite="ui/health" alt="" hidden /><img class="life" data-sprite="ui/health" alt="" hidden /></span></div>
+          <div class="stat" id="s-ghost" hidden><span class="label">FANTASMA</span><span class="value" id="h-ghost">0 m</span></div>
           <div class="hud-actions">
             <button class="btn btn-small" id="btn-pause" type="button">PAUSA</button>
             <button class="btn btn-small" id="btn-mute" type="button" aria-pressed="true">AUDIO: SÌ</button>
@@ -35,6 +36,10 @@
               <div class="bar"><div class="fill" id="f-brainrot"></div></div>
             </div>
           </div>
+          <div class="meter meter-race" id="m-race" hidden>
+            <span class="label">TAPPA <b id="h-stage">1/4 · PARTENZA CONTROLLATA</b></span>
+            <div class="bar race-bar"><div class="fill" id="f-race"></div><span class="ghost-mark" id="g-mark"></span></div>
+          </div>
           <div class="stat stat-pb"><span class="label">PB</span><span class="value" id="h-pb">0</span></div>
         </div>
       </header>
@@ -44,11 +49,18 @@
         <div id="stage">
           <canvas id="game" width="960" height="540" aria-label="Area di gioco di Run Club Rush"></canvas>
           <div id="callout" role="status" aria-live="polite"></div>
+          <div id="station-info" class="station-info" role="status" aria-live="polite" hidden>
+            <strong class="callout-title" id="si-title"></strong>
+            <span class="callout-text" id="si-text"></span>
+          </div>
           <div id="tags" class="hud-tags">
             <span class="tag" id="t-combo" hidden></span>
             <span class="tag" id="t-mult" hidden></span>
             <span class="tag" id="t-boost" hidden><img class="icon" data-sprite="ui/energy" alt="" hidden />TURBO</span>
             <span class="tag tag-bad" id="t-bonk" hidden>IN CRISI · PIÙ LENTO</span>
+            <span class="tag tag-warn" id="t-sand" hidden>SABBIA · PIÙ LENTO</span>
+            <span class="tag" id="t-sprint" hidden>SPRINT DEL PUBBLICO</span>
+            <span class="tag" id="t-stomach" hidden></span>
           </div>
         </div>
         <button class="pad" id="pad-slide" type="button" aria-label="Scivola">SCIVOLA</button>
@@ -64,6 +76,9 @@
           <div class="title-cta">
             <p class="tagline">Un'altra easy run finita fuori soglia.</p>
             <button class="btn btn-primary btn-big" id="btn-play" type="button" disabled>INIZIA A CORRERE</button>
+            <button class="btn btn-marathon" id="btn-marathon" type="button" hidden>MARATONA BRAINROT</button>
+            <p class="records" id="marathon-lock">MARATONA BRAINROT: si sblocca con <b>10.000 punti</b> in una corsa</p>
+            <p class="legend-badge" id="legend-badge" hidden>LEGGENDA DELL'ASFALTO</p>
             <div class="loading" id="loading" role="status" aria-live="polite">
               <div class="progress" aria-hidden="true"><div class="progress-fill" id="load-fill"></div></div>
               <p class="loading-text" id="load-text">Allacciamo le carbon...</p>
@@ -75,7 +90,37 @@
             <p class="asset-warning" id="asset-warning" role="alert" hidden></p>
           </div>
         </div>
-        <p class="fineprint">Parodia di fantasia. Nessun legame con Strava o HYROX.</p>
+        <p class="fineprint">Parodia di fantasia. Nessun legame con Strava, HYROX o Garmin.</p>
+      </div>
+    </section>
+
+    <section class="screen screen-home" id="screen-marathon" aria-labelledby="marathon-title" hidden>
+      <div class="title-card marathon-card">
+        <div class="marathon-hero">
+        <img class="logo-img logo-small" src="/assets/logo_runclubrush-web.jpg" alt="Run Club Rush" width="1100" height="726" />
+        <svg class="start-arch" viewBox="0 0 320 120" role="img" aria-label="Arco di partenza">
+          <rect x="18" y="26" width="22" height="94" rx="9" fill="#356BFF" stroke="#0B1630" stroke-width="4" />
+          <rect x="280" y="26" width="22" height="94" rx="9" fill="#356BFF" stroke="#0B1630" stroke-width="4" />
+          <rect x="6" y="4" width="308" height="40" rx="20" fill="#356BFF" stroke="#0B1630" stroke-width="4" />
+          <text x="160" y="32" text-anchor="middle" font-size="24" font-weight="900" fill="#FFF5E6">PARTENZA · 42,195 KM</text>
+        </svg>
+        <h2 id="marathon-title" class="screen-title">MARATONA BRAINROT</h2>
+        </div>
+        <div class="marathon-info">
+        <p class="subtitle">Quattro tappe, un fantasma da battere, nessuna stazione HYROX. Circa 3 minuti di gara.</p>
+        <ol class="stages">
+          <li><b>Km 0–10 · Partenza controllata</b> I turbo costano energia: dosali.</li>
+          <li><b>Km 10–21 · Fueling</b> I gel ricaricano, ma lo stomaco ha un limite.</li>
+          <li><b>Km 21–35 · Il muro</b> Acqua a terra o power-up in alto: scegli.</li>
+          <li><b>Km 35–42,195 · Finale</b> Kudos del pubblico = sprint. Batti il fantasma.</li>
+        </ol>
+        <p class="records">RECORD MARATONA <b id="r-mscore">0</b> · MIGLIOR TEMPO <b id="r-mtime">-</b></p>
+        <p class="legend-badge" id="legend-badge-m" hidden>LEGGENDA DELL'ASFALTO</p>
+        <div class="actions">
+          <button class="btn btn-primary" id="btn-marathon-start" type="button">INIZIA LA MARATONA</button>
+          <button class="btn" id="btn-marathon-back" type="button">MODALITÀ ARCADE</button>
+        </div>
+        </div>
       </div>
     </section>
 
@@ -95,6 +140,8 @@
       <div class="panel">
         <h2 id="over-title" class="screen-title">FINE CORSA</h2>
         <p class="pb-badge" id="o-pb" hidden>NUOVO PB!</p>
+        <p class="unlock-banner" id="o-unlock" hidden>MARATONA BRAINROT SBLOCCATA!</p>
+        <img class="medal" id="o-medal" alt="Medaglia della maratona" hidden />
         <p class="message" id="o-msg"></p>
         <div class="activity">
           <p class="activity-head"><b id="o-name">Corsa mattutina</b> · caricata ora</p>
@@ -105,12 +152,14 @@
             <div><dt>PACE MEDIO</dt><dd id="o-pace">-</dd></div>
             <div><dt>KUDOS</dt><dd id="o-kudos">0</dd></div>
             <div><dt>SCARPE</dt><dd id="o-shoes">0</dd></div>
+            <div><dt id="o-extra-label">STAZIONI HYROX</dt><dd id="o-extra">0/8</dd></div>
             <div class="wide peak"><img class="portrait" id="o-variant" data-sprite="runner/lv1" alt="" hidden /><div><dt>BRAINROT MASSIMO</dt><dd id="o-level">LV 1</dd></div></div>
-            <div class="wide"><dt>RECORD PERSONALE</dt><dd id="o-best">0</dd></div>
+            <div class="wide"><dt id="o-best-label">RECORD PERSONALE</dt><dd id="o-best">0</dd></div>
           </dl>
         </div>
         <div class="actions">
           <button class="btn btn-primary" id="btn-retry" type="button">RITENTA</button>
+          <button class="btn btn-marathon" id="btn-to-marathon" type="button" hidden>SCOPRI LA MARATONA</button>
           <button class="btn" id="btn-title-from-over" type="button">MENU INIZIALE</button>
         </div>
       </div>

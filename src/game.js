@@ -1,15 +1,26 @@
 import {
-  W, GROUND_Y, PLAYER_X, METERS_PER_PX, FINISH_M, COLORS as C,
-  PHYSICS as P, DIFFICULTY as D, OBSTACLES, RUN_CLUB, NONNA, STAMINA, SCORING, BOOST,
-  ITEMS, ITEM_BAG, LEVELS, ZONES, HIT_REACTIONS, ANIMATIONS,
+  W, GROUND_Y, PLAYER_X, METERS_PER_PX, COLORS as C,
+  PHYSICS as P, DIFFICULTY as D, OBSTACLES, RUN_CLUB, NONNA, DOGWALK, STAMINA, SCORING, BOOST,
+  ITEMS, ITEM_BAG, LEVELS, ZONES, ZONE, ARCADE, MARATHON, GUT, SAND, HIT_REACTIONS, ANIMATIONS,
+  ARCHETYPES, SKINS, HAIR,
 } from './config.js';
 import { joke } from './jokes.js';
+import { nextBillboard, billboardLine } from './billboards.js';
+import { STATIONS, STATION_TIMING as ST, MECHANICS, createStation, stationPoints, stationAccuracy, stationJoke } from './stations.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const randInt = (a, b) => Math.floor(rand(a, b + 1));
 const pick = (arr) => arr[(Math.random() * arr.length) | 0];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
+const shuffle = (arr) => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = (Math.random() * (i + 1)) | 0;
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
 export const overlap = (a, b) =>
   a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
@@ -31,6 +42,7 @@ const ITEM_COLORS = {
   boost: [C.blue, C.orange, C.white],
   brainrot: ['#F48FB1', C.cream],
   streak: [C.gold, C.orange],
+  galletta: ['#E8C98A', C.gold],
 };
 
 export function formatPace(secPerKm) {
@@ -38,25 +50,82 @@ export function formatPace(secPerKm) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
+// Zone sequence of a course: [{ zone (index into ZONES), fromM }].
+function arcadePlan() {
+  const ids = [ARCADE.first, ...shuffle(ARCADE.middle), ARCADE.last];
+  return ids.map((id, i) => ({ zone: ZONE[id], fromM: i * ARCADE.zoneLenM }));
+}
+function marathonPlan() {
+  let from = 0;
+  return MARATHON.stages.map((s) => {
+    const entry = { zone: ZONE[s.zone], fromM: from };
+    from = (s.toKm / MARATHON.km) * MARATHON.finishM;
+    return entry;
+  });
+}
+
+// A run-club member: archetype proportions + randomised colours, plus the club's colour patch.
+function makeLook(kind, club) {
+  const a = ARCHETYPES[kind];
+  return {
+    kind,
+    height: a.height, girth: a.girth, cadence: a.cadence, stride: a.stride, bob: a.bob,
+    top: a.top, bottom: a.bottom, sole: a.sole,
+    shirt: pick(a.shirts), shorts: pick(a.shorts), shoe: pick(a.shoes),
+    skin: pick(SKINS),
+    hair: a.grey ? pick(['#D9D9D9', '#BDBDBD', '#E6E6E6']) : pick(HAIR),
+    ponytail: !a.grey && kind !== 'hybrid' && Math.random() < 0.35,
+    cap: a.cap ?? null,
+    capColor: pick([C.lime, C.cream, C.orange, C.blue, '#2B2B2B']),
+    sunglasses: Boolean(a.sunglasses),
+    headband: Math.random() < (a.headband ?? 0),
+    headphones: Boolean(a.headphones),
+    vest: Boolean(a.vest),
+    bib: Boolean(a.bib),
+    belt: Boolean(a.belt),
+    phone: Boolean(a.phone),
+    wristbands: Boolean(a.wristbands),
+    club,
+  };
+}
+
 export class Game {
   constructor(emit, reducedMotion = false) {
     this.emit = emit;
     this.reducedMotion = reducedMotion;
+    // Progress handed over by main.js (persisted there), never reset between runs.
+    this.marathonUnlocked = false;
+    this.ghostTime = MARATHON.ghostDefaultTime;
     this.toAttract();
   }
 
   toAttract() {
-    this.reset();
+    this.reset('arcade');
     this.mode = 'attract';
   }
 
-  reset() {
+  reset(course = 'arcade') {
+    this.course = course;
+    const marathon = course === 'marathon';
     this.mode = 'run';
+    this.finishM = marathon ? MARATHON.finishM : ARCADE.finishM;
+    this.zonePlan = marathon ? marathonPlan() : arcadePlan();
+    this.stationQueue = marathon ? [] : ARCADE.stationsAt.map((m, i) => ({ m, i }));
+    this.station = null;
+    this.stationsDone = 0;
+    this.stage = -1; // marathon stage, announced on the first step
+    this.stomach = 0;
+    this.crisisT = 0;
+    this.sprintT = 0;
+    this.gutT = 0;
+    this.sandT = 0;
+    this.unlockedNow = false;
     this.t = 0;
+    this.runT = 0; // time spent running (stations excluded), for the average pace
     this.paceSum = 0;
     this.traveled = 0;
     this.meters = 0;
-    this.speed = D.baseSpeed;
+    this.speed = this.baseSpeed;
     this.player = {
       y: GROUND_Y, vy: 0, onGround: true, slideT: 0, slideQueued: false, invuln: 0, phase: 0, jumpBuffer: 0,
       anim: { state: 'run', frame: 0, t: 0 },
@@ -88,8 +157,8 @@ export class Game {
     this.memeT = 4;
     this.kudosQuoteT = 4;
     this.nextKm = 1;
-    this.zone = 0;
-    this.prevZone = 0;
+    this.zone = this.zonePlan[0].zone;
+    this.prevZone = this.zone;
     this.zoneBlend = 1;
     this.nextPropAt = 150;
     this.firstKudos = true;
@@ -106,6 +175,7 @@ export class Game {
   // ---------- input ----------
   jump() {
     if (this.mode !== 'run') return;
+    if (this.inStation) return this.stationInput('A', true);
     const p = this.player;
     p.jumpBuffer = P.jumpBuffer;
     if (p.onGround) this.doJump();
@@ -122,8 +192,14 @@ export class Game {
   }
 
   slide(held) {
+    const was = this.slideHeld;
     this.slideHeld = held;
-    if (!held || this.mode !== 'run') return;
+    if (this.mode !== 'run') return;
+    if (this.inStation) {
+      if (held !== was) this.stationInput('B', held);
+      return;
+    }
+    if (!held) return;
     const p = this.player;
     if (p.onGround) {
       if (p.slideT <= 0) this.emit('sfx', 'slide');
@@ -134,9 +210,53 @@ export class Game {
     }
   }
 
+  stationInput(key, down) {
+    const st = this.station;
+    if (st.phase !== 'active') return;
+    const m = MECHANICS[st.def.mech];
+    const [hits, misses] = [st.hits, st.misses];
+    if (down) m.press?.(st, key);
+    else m.release?.(st, key);
+    if (st.hits > hits) this.emit('sfx', 'kudos');
+    else if (st.misses > misses) this.emit('sfx', 'slide');
+  }
+
   // ---------- derived values ----------
+  get marathon() {
+    return this.course === 'marathon';
+  }
+
+  get baseSpeed() {
+    return this.course === 'marathon' ? MARATHON.baseSpeed : D.baseSpeed;
+  }
+
   get score() {
-    return Math.floor(Math.min(this.meters, FINISH_M)) * SCORING.pointsPerMeter + this.itemScore + this.finishBonus;
+    return Math.floor(Math.min(this.meters, this.finishM)) * SCORING.pointsPerMeter + this.itemScore + this.finishBonus;
+  }
+
+  // Distance shown to the player: real km in the arcade, symbolic km in the marathon.
+  get displayKm() {
+    const m = Math.min(this.meters, this.finishM);
+    return this.marathon ? (m / this.finishM) * MARATHON.km : m / 1000;
+  }
+
+  get totalKm() {
+    return this.marathon ? MARATHON.km : this.finishM / 1000;
+  }
+
+  get stageInfo() {
+    return this.marathon ? MARATHON.stages[Math.max(0, this.stage)] : null;
+  }
+
+  // Ghost runner of the marathon: replays the best time (or the default one) with an accelerating
+  // profile, like the player's own run. Gap in symbolic metres (> 0 = you are ahead).
+  get ghostMeters() {
+    const u = clamp(this.t / this.ghostTime, 0, 1);
+    return this.finishM * ((u + 0.35 * u * u) / 1.35);
+  }
+
+  get ghostGap() {
+    return ((this.meters - this.ghostMeters) / this.finishM) * MARATHON.km * 1000;
   }
 
   get levelInfo() {
@@ -149,16 +269,23 @@ export class Game {
     return 360 - f * 165;
   }
 
+  get inStation() {
+    const ph = this.station?.phase;
+    return ph === 'intro' || ph === 'active' || ph === 'outro';
+  }
+
   // An obstacle is about to reach the runner: the UI holds back low-priority chatter.
   get imminent() {
+    if (this.inStation) return false;
     const reach = this.speed * D.imminentSeconds;
     return this.obstacles.some((o) => !o.hit && o.x + (o.span || o.w) > PLAYER_X - 10 && o.x - PLAYER_X < reach);
   }
 
   targetSpeed() {
+    const perKm = this.marathon ? MARATHON.speedPerKm : D.speedPerKm;
     return Math.min(
       D.maxSpeed,
-      D.baseSpeed + (this.meters / 1000) * D.speedPerKm + this.t * D.speedPerSecond + (this.level - 1) * D.speedPerLevel,
+      this.baseSpeed + (this.meters / 1000) * perKm + this.runT * D.speedPerSecond + (this.level - 1) * D.speedPerLevel,
     );
   }
 
@@ -188,6 +315,12 @@ export class Game {
   get playerFrame() {
     const a = this.player.anim;
     return ANIMATIONS[a.state].frames[a.frame];
+  }
+
+  zoneAt(meters) {
+    let z = this.zonePlan[0].zone;
+    for (const entry of this.zonePlan) if (meters >= entry.fromM) z = entry.zone;
+    return z;
   }
 
   updateAnim(h) {
@@ -227,10 +360,28 @@ export class Game {
   step(h) {
     const p = this.player;
     const attract = this.mode === 'attract';
+    if (!attract && this.inStation) {
+      this.stepStation(h);
+      return;
+    }
+    const st = this.station;
 
     let target = attract ? 110 : this.targetSpeed();
-    if (!attract && this.boostT > 0) target *= BOOST.speedMult;
-    if (!attract && this.stamina <= 0) target *= STAMINA.exhaustedSpeedMult;
+    if (!attract) {
+      if (this.boostT > 0) target *= BOOST.speedMult;
+      if (this.stamina <= 0) target *= STAMINA.exhaustedSpeedMult;
+      if (this.sandT > 0) target *= SAND.speedMult;
+      if (this.crisisT > 0) target *= MARATHON.stomach.crisisSpeedMult;
+      if (this.marathon) {
+        target *= this.stageInfo.sprint ?? 1;
+        if (this.sprintT > 0) target *= MARATHON.sprintMult;
+      }
+      // Ease into the station instead of stopping dead.
+      if (st?.phase === 'approach') {
+        const d = st.x - PLAYER_X;
+        if (d < ST.approachPx) target = Math.max(45, (target * d) / ST.approachPx);
+      }
+    }
     this.speed += (target - this.speed) * Math.min(1, h * 5);
     this.traveled += this.speed * h;
     this.meters = this.traveled * METERS_PER_PX;
@@ -243,13 +394,19 @@ export class Game {
     if (attract) return;
 
     this.t += h;
+    this.runT += h;
     this.paceSum += this.pace * h;
+    if (this.marathon) this.updateStage();
 
     // stamina
     const before = this.stamina;
-    this.stamina = Math.max(0, this.stamina - STAMINA.drainPerSec * (this.boostT > 0 ? STAMINA.boostDrainMult : 1) * h);
+    const drain = this.marathon ? this.stageInfo.drain : STAMINA.drainPerSec;
+    const boostMult = this.marathon ? MARATHON.boostDrainMult : STAMINA.boostDrainMult;
+    this.stamina = Math.max(0, this.stamina - drain * (this.boostT > 0 ? boostMult : 1) * h);
     if (before > 0 && this.stamina === 0) {
-      this.say('Crisi! Le gambe hanno abbandonato il gruppo WhatsApp.', 'bad', PRIO.high);
+      this.say(this.marathon && this.stageInfo.choice
+        ? 'Il muro! Le gambe hanno abbandonato il gruppo WhatsApp.'
+        : 'Crisi! Le gambe hanno abbandonato il gruppo WhatsApp.', 'bad', PRIO.high);
       this.emit('sfx', 'bonk');
     }
 
@@ -257,6 +414,11 @@ export class Game {
     if (p.invuln > 0) p.invuln -= h;
     this.boostT = Math.max(0, this.boostT - h);
     this.multT = Math.max(0, this.multT - h);
+    this.sandT = Math.max(0, this.sandT - h);
+    this.crisisT = Math.max(0, this.crisisT - h);
+    this.sprintT = Math.max(0, this.sprintT - h);
+    this.gutT = Math.max(0, this.gutT - h); // the gel joke window simply expires
+    if (this.marathon) this.stomach = Math.max(0, this.stomach - MARATHON.stomach.decayPerSec * h);
     this.comboT -= h;
     if (this.comboT <= 0) this.combo = 0;
     this.kudosQuoteT -= h;
@@ -286,8 +448,11 @@ export class Game {
       if (Math.random() < 0.3) this.particles.push(this.particle(PLAYER_X + 8, GROUND_Y - 1, rand(-80, -20), rand(-40, -10), '#C9A26B', 0.3, 2));
     }
 
-    // spawning
-    if (this.traveled >= this.nextObstacleAt && this.meters < FINISH_M - D.finishClearM) this.spawnObstacle();
+    // spawning: a due HYROX station takes the next obstacle slot (so it inherits its fair gap)
+    if (this.traveled >= this.nextObstacleAt && this.meters < this.finishM - D.finishClearM) {
+      if (!this.station && this.stationQueue.length && this.meters >= this.stationQueue[0].m) this.spawnStation();
+      else this.spawnObstacle();
+    }
 
     // movement: everything scrolls with the world, minus its own speed v
     for (const o of this.obstacles) {
@@ -299,16 +464,24 @@ export class Game {
       it.x -= (this.speed - it.v) * h;
       it.bob += h * 4;
     }
+    if (st) {
+      st.x -= this.speed * h;
+      if (st.phase === 'approach' && st.x <= PLAYER_X) this.beginStation();
+      else if (st.phase === 'done' && st.x < -170) this.station = null;
+      if (this.inStation) return;
+    }
 
     // hints the first time each obstacle family shows up
     for (const o of this.obstacles) {
-      const kind = o.type === 'runclub' ? 'club' : OBSTACLES[o.type].fly ? 'slide' : 'jump';
+      const cfg = OBSTACLES[o.type];
+      const kind = o.type === 'runclub' ? 'club' : cfg.soft ? 'sand' : cfg.fly ? 'slide' : 'jump';
       if (!this.hintsShown[kind] && o.x < W - 40) {
         this.hintsShown[kind] = true;
         const text = {
           jump: 'Salta! SPAZIO / ↑ / tocca a sinistra',
           slide: 'Scivola sotto! ↓ / S / tocca a destra',
           club: 'Run club! Salta solo chi corre nella tua corsia',
+          sand: 'Sabbia! Saltala per non rallentare',
         }[kind];
         this.say(text, 'info', PRIO.high);
       }
@@ -317,7 +490,12 @@ export class Game {
     // collisions
     const pr = this.playerRect();
     for (const o of this.obstacles) {
-      if (!o.hit && this.obstacleBoxes(o).some((b) => overlap(pr, b))) this.onHit(o);
+      if (o.hit || !this.obstacleBoxes(o).some((b) => overlap(pr, b))) continue;
+      if (OBSTACLES[o.type].soft) {
+        if (p.onGround) this.onSand(o);
+        continue;
+      }
+      this.onHit(o);
       if (this.mode !== 'run') return;
     }
     for (const it of this.items) {
@@ -336,22 +514,27 @@ export class Game {
         this.say(joke('runclub'), 'good', PRIO.normal);
         this.addBrainrot(RUN_CLUB.passBrainrot);
       } else if (Math.random() < 0.4) {
-        this.say(joke('nonna'), 'good', PRIO.low);
+        this.say(joke(o.type === 'dogwalk' ? 'dogwalk' : 'nonna'), 'good', PRIO.low);
       }
     }
     this.obstacles = this.obstacles.filter((o) => o.x + (o.span || o.w) > -60);
     this.items = this.items.filter((it) => it.x > -30 && !it.taken);
 
     // social feed
-    if (this.meters >= this.nextKm * 1000 && this.nextKm < FINISH_M / 1000) {
+    if (!this.marathon && this.meters >= this.nextKm * 1000 && this.nextKm < this.finishM / 1000) {
       this.emit('toast', { title: `SPLIT KM ${this.nextKm}`, body: `${formatPace(this.pace)}/km. L'orologio ha vibrato con disapprovazione.` });
       this.nextKm++;
     }
     this.feedT -= h;
     if (this.feedT <= 0) {
       this.feedT = rand(12, 18);
-      if (this.level >= 3 && Math.random() < 0.4) {
+      const r = Math.random();
+      if (this.level >= 3 && r < 0.3) {
         this.say(joke('brainrot'), 'good', PRIO.low);
+      } else if (r < 0.55) {
+        this.emit('toast', { title: 'NOTIFICA GARMIN', body: joke('garmin') });
+      } else if (r < 0.68) {
+        this.emit('toast', { title: 'DIARIO ALIMENTARE', body: joke('gallette') });
       } else {
         const club = Math.random() < 0.4;
         this.emit('toast', { title: club ? 'CHAT DEL RUN CLUB' : 'FEED ATTIVITÀ', body: joke(club ? 'club' : 'feed') });
@@ -365,31 +548,50 @@ export class Game {
       }
     }
 
-    if (this.meters >= FINISH_M) this.end(true);
+    this.checkUnlock();
+    if (this.meters >= this.finishM) this.end(true);
   }
 
   updateZone(h, attract) {
-    let z = 0;
-    ZONES.forEach((zone, i) => { if (this.meters >= zone.fromM) z = i; });
-    if (attract) z = Math.floor(this.meters / 400) % ZONES.length;
+    const z = attract ? Math.floor(this.meters / 400) % ZONES.length : this.zoneAt(this.meters);
     if (z !== this.zone) {
       this.prevZone = this.zone;
       this.zone = z;
       this.zoneBlend = 0;
-      if (!attract) this.emit('toast', { title: 'NUOVA ZONA', body: `${ZONES[z].name}. Caccia ai segmenti aperta.` });
+      // In the marathon the stage announcement already says where you are.
+      if (!attract && !this.marathon) this.emit('toast', { title: `NUOVA ZONA · ${ZONES[z].name}`, body: ZONES[z].intro });
     }
     this.zoneBlend = Math.min(1, this.zoneBlend + h / 1.2);
   }
 
+  updateStage() {
+    const km = this.displayKm;
+    let s = MARATHON.stages.findIndex((x) => km < x.toKm);
+    if (s < 0) s = MARATHON.stages.length - 1;
+    if (s === this.stage) return;
+    this.stage = s;
+    this.bag = [];
+    const info = MARATHON.stages[s];
+    this.emit('stage', { index: s, total: MARATHON.stages.length, name: info.name, intro: info.intro });
+  }
+
   updateProps(h) {
     if (this.traveled >= this.nextPropAt) {
+      const zone = ZONES[this.zone];
+      const crowd = this.marathon || zone.id === 'marathon';
       const r = Math.random();
-      const type = r < 0.45 ? 'club' : r < 0.75 ? 'hyrox' : 'coffee';
-      this.props.push({ type, x: W + 10, variant: (Math.random() * 3) | 0 });
-      this.nextPropAt = this.traveled + rand(700, 1200);
+      const x = W + 10;
+      if (crowd && r < 0.35) {
+        this.props.push({ type: 'crowd', x, n: randInt(3, 5), sign: billboardLine('marathon'), seed: Math.random() * 100 });
+      } else if (crowd && r < 0.5) {
+        this.props.push({ type: 'ristoro', x });
+      } else {
+        this.props.push({ type: 'billboard', x, zone: zone.id, ...nextBillboard(zone.billboards) });
+      }
+      this.nextPropAt = this.traveled + rand(620, 1000);
     }
     for (const pr of this.props) pr.x -= this.speed * 0.55 * h;
-    this.props = this.props.filter((pr) => pr.x > -140);
+    this.props = this.props.filter((pr) => pr.x > -150);
   }
 
   updateFx(h) {
@@ -409,9 +611,68 @@ export class Game {
     this.flash = Math.max(0, this.flash - h);
   }
 
+  // ---------- HYROX stations ----------
+  spawnStation() {
+    const q = this.stationQueue.shift();
+    this.station = Object.assign(createStation(q.i), { phase: 'approach', x: W + 40 });
+    this.nextObstacleAt = Infinity; // nothing else until the station is over
+  }
+
+  beginStation() {
+    const st = this.station;
+    const p = this.player;
+    Object.assign(st, { phase: 'intro', t: 0, x: PLAYER_X });
+    this.speed = 0;
+    Object.assign(p, { y: GROUND_Y, vy: 0, onGround: true, slideT: 0, slideQueued: false, jumpBuffer: 0 });
+    this.emit('sfx', 'pickup');
+  }
+
+  stepStation(h) {
+    const st = this.station;
+    this.t += h;
+    st.t += h;
+    if (st.fb && (st.fb.t -= h) <= 0) st.fb = null;
+    this.updateFx(h);
+    this.updateAnim(h);
+    if (st.phase === 'intro') {
+      if (st.t >= ST.intro) {
+        Object.assign(st, { phase: 'active', t: 0 });
+        if (this.slideHeld && MECHANICS[st.def.mech].holdStart) MECHANICS[st.def.mech].press(st, 'B');
+      }
+    } else if (st.phase === 'active') {
+      MECHANICS[st.def.mech].update(st, h, this.slideHeld);
+      if (st.progress >= 100 || st.t >= st.def.time) this.finishStation();
+    } else if (st.t >= ST.outro) {
+      st.phase = 'done';
+      this.nextObstacleAt = this.traveled + ST.resumeGapPx;
+      this.nextType = this.pickType();
+    }
+  }
+
+  finishStation() {
+    const st = this.station;
+    const done = st.progress >= 100;
+    const points = stationPoints(st);
+    st.result = { done, points, accuracy: stationAccuracy(st) };
+    st.phase = 'outro';
+    st.t = 0;
+    this.itemScore += points;
+    if (done) {
+      this.stationsDone++;
+      this.confetti(this.reducedMotion ? 6 : 18);
+    }
+    this.texts.push({ x: PLAYER_X + 34, y: GROUND_Y - 66, text: `+${points}`, life: 1.3, color: C.lime });
+    this.say(done ? stationJoke(st.def.id) : `${st.def.name}: tempo scaduto. La Roxzone ti aspetta.`, done ? 'good' : 'bad', PRIO.normal);
+    this.emit('sfx', done ? 'levelup' : 'bonk');
+    this.addBrainrot(done ? st.def.brainrot : 1);
+    this.checkUnlock();
+  }
+
   // ---------- spawning ----------
   pickType() {
-    const avail = Object.entries(OBSTACLES).filter(([, o]) => this.meters >= o.minM && this.level >= (o.minLevel || 0));
+    const zoneId = ZONES[this.zone].id;
+    const avail = Object.entries(OBSTACLES).filter(([, o]) =>
+      this.meters >= o.minM && this.level >= (o.minLevel || 0) && (!o.zones || o.zones.includes(zoneId)));
     let r = Math.random() * avail.reduce((s, [, o]) => s + o.weight, 0);
     for (const [type, o] of avail) {
       r -= o.weight;
@@ -424,14 +685,14 @@ export class Game {
   scheduleNext(o) {
     const type = this.pickType();
     const S = this.targetSpeed(); // un-boosted, so gaps stay fair once a boost ends
-    const prog = clamp(this.meters / D.rampMeters, 0, 1);
+    const prog = clamp(this.meters / (this.finishM * D.rampShare), 0, 1);
     const secs = Math.max(D.minGapSeconds, lerp(D.gapStart, D.gapEnd, prog) - (this.level - 1) * D.gapPerLevel)
       * (1 + Math.random() * D.gapJitter);
     const span = o.span || o.w;
     let gap = S * secs + span;
     if (o.v > 0) {
-      // Slower than the world (run club, grannies): the next obstacle must not catch up with
-      // them before they are past the runner, plus the usual reaction time.
+      // Slower than the world (run club, grannies, dog walkers): the next obstacle must not catch up
+      // with them before they are past the runner, plus the usual reaction time.
       const tailArrives = (o.x + span - PLAYER_X) / (S - o.v);
       gap = Math.max(gap, S * (tailArrives + secs) - (W + 20 - PLAYER_X));
     }
@@ -450,7 +711,8 @@ export class Game {
     const type = this.nextType;
     const cfg = OBSTACLES[type];
     const base = { type, x: W + 20, v: cfg.v || 0, w: cfg.w || 0, hit: false, knocked: false, knockT: 0, anim: Math.random() * 10 };
-    const o = type === 'runclub' ? this.makeRunClub(base) : type === 'nonna' ? this.makeNonna(base) : base;
+    const make = { runclub: this.makeRunClub, nonna: this.makeNonna, dogwalk: this.makeDogwalk }[type];
+    const o = make ? make.call(this, base) : base;
     this.obstacles.push(o);
 
     // Rewards along the path you have to take anyway.
@@ -458,7 +720,7 @@ export class Game {
       for (const m of o.members) if (m.lane === 'front') this.addItem('kudos', o.x + m.dx, GROUND_Y - 58, o.v);
     } else if (cfg.fly) {
       if (Math.random() < 0.7) for (let i = -1; i <= 1; i++) this.addItem('kudos', o.x + o.w / 2 + i * 14, GROUND_Y - 9, o.v);
-    } else if (!cfg.group && Math.random() < 0.5) {
+    } else if (!cfg.group && !cfg.soft && Math.random() < 0.5) {
       const cx = o.x + o.w / 2;
       [[-16, 50], [0, 62], [16, 50]].forEach(([dx, dy]) => this.addItem('kudos', cx + dx, GROUND_Y - dy, o.v));
     }
@@ -467,7 +729,11 @@ export class Game {
     // Gap items only between static/fast obstacles: slow groups would drift through them.
     if (cfg.group || OBSTACLES[this.nextType].group) return;
     const mid = o.x + o.w + (gap - o.w) / 2;
-    if (Math.random() < 0.65) {
+    if (this.marathon && this.stageInfo.choice) {
+      // The wall: water on the ground, or jump for the power-up. Not both.
+      this.addItem('water', mid, GROUND_Y - 13);
+      this.addItem(pick(['boost', 'galletta', 'gel']), mid, GROUND_Y - 62);
+    } else if (Math.random() < 0.65) {
       this.addItem(this.nextBagItem(), mid, GROUND_Y - 13);
     } else if (Math.random() < 0.6) {
       for (let i = -1; i <= 1; i++) this.addItem('kudos', mid + i * 16, GROUND_Y - 13);
@@ -479,64 +745,81 @@ export class Game {
     o.v = S * rand(...RUN_CLUB.speedFactor);
     // Worst-case relative speed by the time they arrive (speed creep, boost), with margin.
     const rel = (Math.min(D.maxSpeed, S * 1.1) - o.v) * BOOST.speedMult;
-    const looks = [...RUN_CLUB.looks].sort(() => Math.random() - 0.5);
+    const kinds = shuffle(Object.keys(ARCHETYPES));
+    const club = this.marathon
+      ? { name: pick(['PACER 3:00', 'PACER 3:30', 'PACER 2:59*', 'PACER 4:00']), color: C.orange }
+      : { name: pick(RUN_CLUB.names), color: pick(RUN_CLUB.colors) };
     const total = randInt(...RUN_CLUB.size);
     const inLane = Math.min(total, randInt(...RUN_CLUB.inLane));
     const members = [];
     let dx = 0;
     for (let i = 0; i < inLane; i++) {
-      members.push({ dx, lane: 'front', w: RUN_CLUB.memberW, h: RUN_CLUB.memberH, look: looks[i], phase: rand(0, 6), scale: rand(0.96, 1.04) });
+      members.push({ dx, lane: 'front', w: RUN_CLUB.memberW, h: RUN_CLUB.memberH, look: makeLook(kinds[i], club.color), phase: rand(0, 6), scale: rand(0.96, 1.04) });
       // Room to land and jump again: one airtime of relative travel + both bodies + slack.
       dx += rel * (P.jumpVelocity * 2 / P.gravity) + RUN_CLUB.memberW + P.standW + RUN_CLUB.laneGapMin + rand(0, 25);
     }
     const laneEnd = members[members.length - 1].dx + RUN_CLUB.memberW / 2;
     for (let i = inLane; i < total; i++) {
-      members.push({ dx: rand(-18, laneEnd + 18), lane: 'back', w: RUN_CLUB.memberW, h: RUN_CLUB.memberH, look: looks[i % looks.length], phase: rand(0, 6), scale: rand(0.84, 0.9) });
+      members.push({ dx: rand(-18, laneEnd + 18), lane: 'back', w: RUN_CLUB.memberW, h: RUN_CLUB.memberH, look: makeLook(kinds[i], club.color), phase: rand(0, 6), scale: rand(0.84, 0.9) });
     }
-    return Object.assign(o, { members, laneEnd, span: laneEnd + 24, w: RUN_CLUB.memberW });
+    return Object.assign(o, { members, laneEnd, span: laneEnd + 24, w: RUN_CLUB.memberW, club });
   }
 
   makeNonna(o) {
     const variant = pick(['bag', 'cart', 'pair', 'cross']);
-    const towards = variant !== 'cross' && Math.random() < 0.35;
+    const towards = variant !== 'cross' && variant !== 'pair' && Math.random() < 0.35;
     o.v = towards ? -NONNA.walkSpeed : NONNA.walkSpeed;
     const facing = towards ? -1 : 1;
     const look = pick(NONNA.looks);
     const prop = variant === 'cart' ? 'cart' : 'bag';
     const w = prop === 'cart' ? 30 : 20;
-    const members = [{ dx: 0, lane: 'front', w, h: NONNA.boxH, look, prop, facing, cross: variant === 'cross' }];
+    // A couple can also cross slowly together: the front one steps into the lane.
+    const cross = variant === 'cross' || (variant === 'pair' && Math.random() < 0.5);
+    const members = [{ dx: 0, lane: 'front', w, h: NONNA.boxH, look, prop, facing, cross }];
     if (variant === 'pair') {
       members.push({ dx: 10, lane: 'back', w: 20, h: NONNA.boxH, look: pick(NONNA.looks.filter((l) => l !== look)), prop: 'bag', facing });
     }
     return Object.assign(o, { members, laneEnd: w / 2, span: w / 2 + 14, w });
   }
 
+  makeDogwalk(o) {
+    o.v = DOGWALK.speed;
+    const members = [
+      { dx: 0, lane: 'front', w: DOGWALK.dogW, h: DOGWALK.dogH, kind: 'dog' },
+      { dx: -DOGWALK.leash, lane: 'back', w: 20, h: NONNA.boxH, kind: 'owner', look: pick(NONNA.looks), prop: 'bag', facing: 1 },
+    ];
+    return Object.assign(o, { members, laneEnd: DOGWALK.dogW / 2, span: DOGWALK.dogW / 2 + 14, w: DOGWALK.dogW });
+  }
+
   nextBagItem() {
     if (this.stamina < STAMINA.low && Math.random() < 0.45) return 'water';
     if (this.lives < 3 && Math.random() < 0.08) return 'health';
-    if (!this.bag.length) {
-      this.bag = [...ITEM_BAG];
-      for (let i = this.bag.length - 1; i > 0; i--) {
-        const j = (Math.random() * (i + 1)) | 0;
-        [this.bag[i], this.bag[j]] = [this.bag[j], this.bag[i]];
-      }
-    }
+    if (!this.bag.length) this.bag = shuffle(this.marathon ? this.stageInfo.bag : ITEM_BAG);
     const next = this.bag.pop();
     return next === 'health' && this.lives >= 3 ? 'exp' : next;
   }
 
   addItem(type, x, y, v = 0) {
-    this.items.push({ type, x, y, v, sprite: pick(ITEMS[type].sprites), bob: Math.random() * 6, taken: false });
+    const sprites = ITEMS[type].sprites;
+    this.items.push({ type, x, y, v, sprite: sprites.length ? pick(sprites) : null, bob: Math.random() * 6, taken: false });
   }
 
   // ---------- events ----------
+  // A gel picked up shortly before a collision turns the hit line into a gut joke, once per gel.
+  takeGutJoke() {
+    if (this.gutT <= 0) return null;
+    this.gutT = 0;
+    return joke('gut');
+  }
+
   onHit(o) {
     const p = this.player;
     if (this.boostT > 0) {
       o.hit = true;
       o.knocked = true;
       this.burst(o.x + (o.w || 20) / 2, GROUND_Y - 12, [C.orange, C.lime, C.cream], 14, 160);
-      this.say('Turbo zuccherino! Ostacolo eliminato.', 'good', PRIO.normal);
+      const gut = this.takeGutJoke();
+      this.say(gut ?? 'Turbo zuccherino! Ostacolo eliminato.', gut ? 'bad' : 'good', gut ? PRIO.high : PRIO.normal);
       this.emit('sfx', 'smash');
       return;
     }
@@ -550,28 +833,52 @@ export class Game {
     this.flash = 0.25;
     this.flashColor = C.red;
     this.burst(PLAYER_X, p.y - 16, [C.red, C.cream, C.orange], 16, 150);
-    this.say(o.type === 'nonna' ? joke('nonna') : pick(HIT_REACTIONS[o.type]), 'bad', PRIO.high);
+    const line = this.takeGutJoke() ?? (o.type === 'nonna' ? joke('nonna') : pick(HIT_REACTIONS[o.type]));
+    this.say(line, 'bad', PRIO.high);
     this.emit('sfx', 'hit');
     if (this.lives <= 0) this.end(false);
+  }
+
+  onSand(o) {
+    if (!o.touched) {
+      o.touched = true;
+      if (this.sandT <= 0) this.say(joke('sand'), 'info', PRIO.low);
+      this.burst(PLAYER_X + 6, GROUND_Y - 2, ['#F2D59B', '#E2BF85'], 8, 70, 0.4);
+    }
+    this.sandT = SAND.slowTime;
+  }
+
+  feedStomach(v) {
+    this.stomach += v;
+    if (this.stomach >= 100 && this.crisisT <= 0) {
+      this.stomach = 60;
+      this.crisisT = MARATHON.stomach.crisisTime;
+      this.say(joke('gut'), 'bad', PRIO.high);
+      this.emit('sfx', 'bonk');
+    }
   }
 
   collect(it) {
     it.taken = true;
     const cfg = ITEMS[it.type];
+    const fuel = this.marathon && it.type === 'gel'; // marathon gel: energy, not turbo
     let pts = cfg.points;
     if (it.type === 'kudos') {
       this.combo = this.comboT > 0 ? Math.min(this.combo + 1, SCORING.comboMax) : 1;
       this.comboT = SCORING.comboWindow;
       pts *= this.combo;
       this.kudos++;
+      if (this.marathon && this.stageInfo.sprint) this.sprintT = MARATHON.sprintKudos;
     }
     if (this.multT > 0) pts *= SCORING.multiplier;
     this.itemScore += pts;
 
     if (it.type === 'shoes') this.shoes++;
     if (it.type === 'bib') this.multT = SCORING.multiplierTime;
-    if (cfg.boost) this.boostT = Math.max(this.boostT, cfg.boost);
-    if (cfg.stamina) this.stamina = Math.min(STAMINA.max, this.stamina + cfg.stamina);
+    if (it.type === 'gel') this.gutT = GUT.window;
+    if (cfg.boost && !fuel) this.boostT = Math.max(this.boostT, cfg.boost);
+    const stamina = fuel ? MARATHON.gelStamina : cfg.stamina;
+    if (stamina) this.stamina = Math.min(STAMINA.max, this.stamina + stamina);
     if (cfg.streak) {
       this.combo = SCORING.comboMax;
       this.comboT = SCORING.comboWindow * 2;
@@ -586,7 +893,7 @@ export class Game {
         label = '+100';
       }
     }
-    if (it.type === 'water') label = `+${cfg.stamina} ENERGIA`;
+    if (it.type === 'water' || fuel) label = `+${stamina} ENERGIA`;
     if (it.type === 'bib') label = `PUNTI x${SCORING.multiplier}`;
     if (it.type === 'brainrot') label = '+BRAINROT';
     this.texts.push({ x: it.x, y: it.y - 10, text: label, life: 1.1, color: it.type === 'kudos' ? C.gold : C.lime });
@@ -603,6 +910,10 @@ export class Game {
       }
     } else {
       this.say(joke(cfg.jokes), 'good', PRIO.normal);
+    }
+    if (this.marathon) {
+      if (it.type === 'gel') this.feedStomach(MARATHON.stomach.perGel);
+      if (it.type === 'galletta') this.feedStomach(MARATHON.stomach.perGalletta);
     }
     this.addBrainrot(cfg.brainrot);
   }
@@ -622,6 +933,14 @@ export class Game {
     }
   }
 
+  // MARATONA BRAINROT unlocks the moment one arcade run reaches the threshold (single-run score).
+  checkUnlock() {
+    if (this.course !== 'arcade' || this.marathonUnlocked || this.score < MARATHON.unlockScore) return;
+    this.marathonUnlocked = true;
+    this.unlockedNow = true;
+    this.emit('unlock', { score: this.score });
+  }
+
   memeEffect() {
     const r = Math.random();
     if (r < 0.25) {
@@ -639,20 +958,31 @@ export class Game {
   end(finished) {
     if (this.mode !== 'run') return;
     this.mode = 'over';
+    const ghostBeaten = this.marathon && finished && this.t < this.ghostTime;
     if (finished) {
-      this.meters = FINISH_M;
-      this.finishBonus = SCORING.finishBonus + this.lives * SCORING.lifeBonus;
+      this.meters = this.finishM;
+      this.finishBonus = this.marathon
+        ? MARATHON.finishBonus + this.lives * MARATHON.lifeBonus + (ghostBeaten ? MARATHON.ghostBonus : 0)
+        : SCORING.finishBonus + this.lives * SCORING.lifeBonus;
       this.confetti(this.reducedMotion ? 10 : 60);
     }
+    this.checkUnlock();
     const peak = LEVELS[this.maxLevel - 1];
     this.result = {
+      course: this.course,
       finished,
       score: this.score,
-      meters: Math.min(this.meters, FINISH_M),
+      meters: Math.min(this.meters, this.finishM),
+      km: this.displayKm,
       time: this.t,
-      pace: this.t > 0 ? this.paceSum / this.t : 0,
+      symbolicTime: this.t * MARATHON.timeFactor,
+      pace: this.runT > 0 ? this.paceSum / this.runT : 0,
       kudos: this.kudos,
       shoes: this.shoes,
+      stations: this.stationsDone,
+      stationsTotal: STATIONS.length,
+      ghostBeaten,
+      unlocked: this.unlockedNow,
       maxLevel: this.maxLevel,
       maxLevelTitle: peak.title,
       maxLevelRank: peak.rank,

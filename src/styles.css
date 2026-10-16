@@ -7,6 +7,7 @@
   --lime: #d5ff52;
   --cream: #fff5e6;
   --red: #e5383b;
+  --gold: #ffc93c;
   --muted: #c9d4ee;
   --font: 'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif;
   --radius: 14px;
@@ -83,6 +84,8 @@ body {
 .btn-big:hover { box-shadow: 0 7px 0 var(--ink); }
 .btn-big:active { transform: translateY(5px); box-shadow: 0 1px 0 var(--ink); }
 .btn-small { height: 32px; padding: 0 12px; font-size: 12px; border-width: 2px; border-radius: 10px; box-shadow: 0 3px 0 var(--ink); }
+.btn-marathon { background: var(--orange); }
+.btn-marathon:hover { background: #ff8a5b; }
 .btn:disabled { cursor: progress; background: #8d95a6; transform: none; box-shadow: 0 4px 0 var(--ink); }
 
 /* ---------- HUD ---------- */
@@ -113,6 +116,7 @@ body {
 #h-pace { min-width: 8ch; }
 #h-score { min-width: 6ch; color: var(--lime); }
 #h-kudos { min-width: 3ch; color: var(--orange); }
+#h-ghost { min-width: 7ch; color: #bfe2ff; }
 .hud-actions { display: flex; gap: 10px; margin-left: auto; }
 
 .meter { flex: 1 1 200px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
@@ -124,6 +128,19 @@ body {
 .meter.is-empty .bar { border-color: var(--red); }
 .meter.is-empty .label b::after { content: ' · CRISI'; color: #ff8a8c; }
 .stat-pb .value { min-width: 7ch; }
+/* marathon: race progress with the ghost's position */
+.race-bar { position: relative; }
+#m-race .fill { background: linear-gradient(90deg, var(--blue), var(--lime)); }
+.ghost-mark {
+  position: absolute;
+  top: -5px;
+  width: 4px;
+  height: 16px;
+  margin-left: -2px;
+  background: #bfe2ff;
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+}
 
 .icon { width: 14px; height: 14px; object-fit: contain; vertical-align: -2px; margin-right: 4px; }
 .lives { display: inline-flex; align-items: center; gap: 3px; min-height: 20px; color: var(--red); }
@@ -194,6 +211,29 @@ body {
 #callout.info { background: var(--blue); color: #fff; box-shadow: 0 4px 0 var(--ink); }
 #callout.level { background: var(--lime); box-shadow: 0 4px 0 var(--blue); }
 #callout.feed { text-align: left; }
+#callout.held { visibility: hidden; }
+/* HYROX station banner: same place and look as an info notification, shown for the whole station */
+.station-info {
+  position: absolute;
+  top: 3.5%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(84%, 640px);
+  display: grid;
+  padding: 0.45em 0.9em;
+  font-size: clamp(12px, 2.2cqw, 20px);
+  font-weight: 800;
+  line-height: 1.25;
+  text-align: center;
+  color: #fff;
+  background: var(--blue);
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  box-shadow: 0 4px 0 var(--ink);
+  pointer-events: none;
+}
+.station-info .callout-title { color: var(--lime); font-variant-numeric: tabular-nums; }
 .callout-title { font-size: 0.68em; letter-spacing: 0.08em; color: #a8360f; }
 #callout.level .callout-title { color: var(--navy); }
 .callout-quote { font-size: 0.78em; font-weight: 700; }
@@ -222,6 +262,7 @@ body {
 }
 .tag .icon { width: 12px; height: 12px; }
 .tag-bad { background: var(--red); color: #fff; }
+.tag-warn { background: var(--orange); color: var(--ink); }
 
 /* ---------- screens ---------- */
 .screen {
@@ -288,6 +329,50 @@ body {
 .asset-warning { margin: 0; padding: 6px 10px; font-size: 13px; font-weight: 700; color: #fff; background: var(--red); border-radius: 8px; }
 .fineprint { margin: 12px 0 0; font-size: 11px; color: var(--muted); }
 
+.legend-badge {
+  margin: 0;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  background: var(--gold);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+}
+.unlock-banner {
+  margin: 4px 0 8px;
+  padding: 8px 12px;
+  font-weight: 900;
+  color: var(--ink);
+  background: var(--orange);
+  border: 3px solid var(--ink);
+  border-radius: 12px;
+}
+.medal { display: block; height: 72px; width: auto; margin: 0 auto 8px; }
+
+/* marathon screen */
+.marathon-card { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.marathon-hero, .marathon-info { display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; width: 100%; }
+.marathon-info .subtitle, .marathon-info .actions { margin: 0; }
+.logo-small { max-width: 300px; max-height: 18vh; }
+.start-arch { width: min(100%, 320px); height: auto; }
+.stages {
+  width: 100%;
+  margin: 0;
+  padding: 10px 14px 10px 34px;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--ink);
+  background: var(--cream);
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+}
+.stages li + li { margin-top: 4px; }
+.stages b { display: block; color: #a8360f; }
+
 .pb-badge {
   display: inline-block;
   margin: 4px 0 8px;
@@ -349,6 +434,10 @@ body {
   .title-card { padding: 14px 12px; }
   .activity-stats .wide { grid-column: 1 / -1; }
   .btn-big { padding: 0 24px; font-size: 19px; }
+  .stages { font-size: 13px; }
+  .logo-small { max-height: 13vh; }
+  .start-arch { width: min(100%, 220px); }
+  .marathon-card .screen-title { font-size: 28px; }
 }
 
 @media (max-height: 520px) {
@@ -365,6 +454,13 @@ body {
   .title-body { margin-top: 0; }
   .hero-runner { height: clamp(80px, 34vh, 140px); }
   .fineprint { grid-column: 1 / -1; margin-top: 6px; }
+  .marathon-card { flex-direction: row; align-items: center; gap: 14px; }
+  .marathon-hero, .marathon-info { flex: 1 1 0; }
+  .marathon-info .subtitle { margin: 0 0 6px; font-size: 13px; }
+  .marathon-card .logo-small { max-height: 22vh; }
+  .marathon-card .start-arch { max-height: 18vh; }
+  .marathon-card .screen-title { font-size: 26px; }
+  .stages { font-size: 12px; padding: 6px 10px 6px 28px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

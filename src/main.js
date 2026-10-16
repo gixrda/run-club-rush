@@ -4,31 +4,20 @@ import { createRenderer } from './render.js';
 import { loadAssets, LOGO_FALLBACK_SRC } from './sprites.js';
 import { initAudio, setMuted as setAudioMuted, sfx } from './audio.js';
 import { joke } from './jokes.js';
+import { loadProgress as loadStore, saveProgress, recordResult } from './progress.js';
+import { MARATHON } from './config.js';
 import * as ui from './ui.js';
 
 const $ = (id) => document.getElementById(id);
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-// ---------- persistence (storage may be unavailable: private mode, blocked site data) ----------
-const KEY = 'strava-brainrot:v1';
-function load() {
-  try {
-    return { bestScore: 0, bestDistance: 0, muted: false, ...JSON.parse(localStorage.getItem(KEY) || '{}') };
-  } catch {
-    return { bestScore: 0, bestDistance: 0, muted: false };
-  }
-}
-function save() {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(store));
-  } catch {
-    /* records just won't persist */
-  }
-}
-const store = load();
+// ---------- persistence (progress.js) ----------
+const store = loadStore();
+const save = () => saveProgress(store);
 
 // ---------- game wiring ----------
 let state = 'loading'; // loading | title | starting | playing | paused | over
+let course = 'arcade'; // arcade | marathon: retry and restart keep the current one
 let renderer = null; // created once the assets are loaded
 const canvas = $('game');
 const game = new Game(onEvent, reducedMotion);
@@ -41,6 +30,14 @@ function onEvent(type, data) {
     case 'callout': ui.notify(data); break;
     case 'toast': ui.toast(data); break;
     case 'levelup': ui.levelUp(data); break;
+    case 'stage': ui.stage(data); break;
+    case 'unlock':
+      // Saved right away: the unlock survives even if the run is abandoned.
+      store.marathonUnlocked = true;
+      save();
+      ui.marathonUnlocked();
+      sfx('levelup');
+      break;
     case 'gameover': gameOver(data); break;
   }
 }
@@ -48,20 +45,21 @@ function onEvent(type, data) {
 function gameOver(result) {
   state = 'over';
   ui.updateHUD(game, store); // reflect the finish bonus
-  const isPB = result.score > store.bestScore;
-  store.bestScore = Math.max(store.bestScore, result.score);
-  store.bestDistance = Math.max(store.bestDistance, result.meters);
+  const info = recordResult(store, result);
   save();
   ui.setRecords(store);
-  const message = joke(result.finished ? 'finish' : 'dnf');
+  const marathon = result.course === 'marathon';
+  const message = joke(marathon ? (result.finished ? 'marathonFinish' : 'marathonDnf') : result.finished ? 'finish' : 'dnf');
   // Brief beat so the crash/finish registers before the results cover the scene.
   setTimeout(() => {
-    if (state === 'over') ui.showResults(result, store, isPB, message);
+    if (state === 'over') ui.showResults(result, store, info, message);
   }, 700);
 }
 
 function beginRun() {
-  game.reset();
+  game.marathonUnlocked = store.marathonUnlocked;
+  game.ghostTime = store.marathonBestTime || MARATHON.ghostDefaultTime;
+  game.reset(course);
   ui.clearTransient();
   state = 'playing';
   ui.showScreen(null);
@@ -69,8 +67,10 @@ function beginRun() {
   last = performance.now();
 }
 
-function start() {
+function start(which = course) {
   if (state === 'loading' || state === 'starting' || state === 'playing') return;
+  if (which === 'marathon' && !store.marathonUnlocked) which = 'arcade';
+  course = which;
   initAudio();
   if (state === 'title' && !reducedMotion) {
     // Short fade from the title screen into the run; the attract scene keeps moving meanwhile.
@@ -96,12 +96,17 @@ function resume() {
   last = performance.now();
 }
 
-function toTitle() {
+function toTitle(screen = 'title') {
   state = 'title';
   game.toAttract();
   ui.clearTransient();
   ui.setRecords(store);
-  ui.showScreen('title');
+  ui.showScreen(screen);
+}
+
+function openMarathon() {
+  if (!store.marathonUnlocked || (state !== 'title' && state !== 'over')) return;
+  toTitle('marathon');
 }
 
 function toggleMute() {
@@ -114,9 +119,17 @@ function toggleMute() {
 // ---------- input ----------
 const JUMP_KEYS = ['Space', 'ArrowUp', 'KeyW'];
 const SLIDE_KEYS = ['ArrowDown', 'KeyS'];
+// HYROX stations also take left/right (A = left, B = right), e.g. for the farmer's carry balance.
+const STATION_A = ['ArrowLeft', 'KeyA'];
+const STATION_B = ['ArrowRight', 'KeyD'];
 
 window.addEventListener('keydown', (e) => {
   if (state === 'playing') {
+    if (game.inStation && (STATION_A.includes(e.code) || STATION_B.includes(e.code))) {
+      e.preventDefault();
+      if (STATION_A.includes(e.code)) { if (!e.repeat) game.jump(); } else game.slide(true);
+      return;
+    }
     if (JUMP_KEYS.includes(e.code)) {
       e.preventDefault();
       if (!e.repeat) game.jump();
@@ -140,14 +153,15 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyM') toggleMute();
   // Enter: start / restart / resume, unless a button has focus (it handles Enter natively).
   if (e.code === 'Enter' && document.activeElement?.tagName !== 'BUTTON') {
-    if (state === 'title' || (state === 'over' && ui.currentScreen === 'over')) start();
+    if (state === 'title') start(ui.currentScreen === 'marathon' ? 'marathon' : 'arcade');
+    else if (state === 'over' && ui.currentScreen === 'over') start();
     else if (state === 'paused') resume();
   }
   if (e.code.startsWith('Arrow') && state === 'playing') e.preventDefault();
 });
 
 window.addEventListener('keyup', (e) => {
-  if (SLIDE_KEYS.includes(e.code)) game.slide(false);
+  if (SLIDE_KEYS.includes(e.code) || STATION_B.includes(e.code)) game.slide(false);
 });
 
 // Touch / mouse on the canvas: left half jumps, right half slides (hold to keep sliding).
@@ -186,12 +200,16 @@ $('pad-slide').addEventListener('pointerdown', (e) => {
 for (const ev of ['pointerup', 'pointercancel']) $('pad-slide').addEventListener(ev, () => game.slide(false));
 for (const id of ['pad-jump', 'pad-slide']) $(id).addEventListener('contextmenu', (e) => e.preventDefault());
 
-$('btn-play').addEventListener('click', start);
-$('btn-retry').addEventListener('click', start);
-$('btn-restart').addEventListener('click', start);
+$('btn-play').addEventListener('click', () => start('arcade'));
+$('btn-retry').addEventListener('click', () => start());
+$('btn-restart').addEventListener('click', () => start());
+$('btn-marathon').addEventListener('click', openMarathon);
+$('btn-to-marathon').addEventListener('click', openMarathon);
+$('btn-marathon-start').addEventListener('click', () => start('marathon'));
+$('btn-marathon-back').addEventListener('click', () => toTitle('title'));
 $('btn-resume').addEventListener('click', resume);
-$('btn-title-from-pause').addEventListener('click', toTitle);
-$('btn-title-from-over').addEventListener('click', toTitle);
+$('btn-title-from-pause').addEventListener('click', () => toTitle());
+$('btn-title-from-over').addEventListener('click', () => toTitle());
 $('btn-pause').addEventListener('click', (e) => {
   e.currentTarget.blur();
   pause();
@@ -246,7 +264,7 @@ function frame(now) {
   }
   if (state === 'playing') {
     ui.updateHUD(game, store);
-    ui.tickNotifications(dt, game.imminent);
+    ui.tickNotifications(dt, game.imminent, game.inStation);
   }
   requestAnimationFrame(frame);
 }

@@ -1,10 +1,17 @@
-import { FINISH_M } from './config.js';
+import { MARATHON, LEGEND_TITLE } from './config.js';
 import { formatPace } from './game.js';
+import { STATIONS } from './stations.js';
 
 const $ = (id) => document.getElementById(id);
 const fmtInt = (n) => Math.floor(n).toLocaleString('it-IT');
 const fmtKm = (m) => `${(m / 1000).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} km`;
 const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+const pad2 = (n) => String(Math.floor(n)).padStart(2, '0');
+// Symbolic marathon time: 1 s of play = 1 minute, shown as h:mm:ss.
+const fmtRace = (playSeconds) => {
+  const s = playSeconds * MARATHON.timeFactor;
+  return `${Math.floor(s / 3600)}:${pad2((s % 3600) / 60)}:${pad2(s % 60)}`;
+};
 
 // Only touch the DOM when a value actually changes.
 const cache = new Map();
@@ -13,7 +20,7 @@ function set(id, value, prop = 'textContent') {
   if (cache.get(key) === value) return;
   cache.set(key, value);
   if (prop === 'hidden') $(id).hidden = value;
-  else if (prop === 'width') $(id).style.width = value;
+  else if (prop === 'width' || prop === 'left') $(id).style[prop] = value;
   else $(id)[prop] = value;
 }
 
@@ -43,7 +50,7 @@ function variantImg(key, cls) {
 }
 
 // ---------- screens ----------
-const screens = ['title', 'pause', 'over'];
+const screens = ['title', 'marathon', 'pause', 'over'];
 export let currentScreen = 'title';
 
 export function showScreen(name) {
@@ -53,14 +60,14 @@ export function showScreen(name) {
     el.hidden = s !== name;
     el.classList.remove('leaving');
   }
-  $('hud').hidden = name === 'title';
-  const focus = { title: 'btn-play', pause: 'btn-resume', over: 'btn-retry' }[name];
+  $('hud').hidden = name === 'title' || name === 'marathon';
+  const focus = { title: 'btn-play', marathon: 'btn-marathon-start', pause: 'btn-resume', over: 'btn-retry' }[name];
   if (focus && !$(focus).disabled) $(focus).focus({ preventScroll: true });
 }
 
-// Short fade-out of the title screen before the run starts.
+// Short fade-out of the title (or marathon) screen before the run starts.
 export function leaveTitle(ms, done) {
-  const el = $('screen-title');
+  const el = $(`screen-${currentScreen}`);
   el.classList.add('leaving');
   setTimeout(done, ms);
 }
@@ -90,6 +97,12 @@ export function finishLoading({ logoOk, essentialMissing, missingCount }) {
 export function setRecords(records) {
   $('r-score').textContent = fmtInt(records.bestScore);
   $('r-dist').textContent = fmtKm(records.bestDistance);
+  $('btn-marathon').hidden = !records.marathonUnlocked;
+  $('marathon-lock').hidden = records.marathonUnlocked;
+  $('legend-badge').hidden = !records.legend;
+  $('legend-badge-m').hidden = !records.legend;
+  $('r-mscore').textContent = fmtInt(records.marathonBestScore);
+  $('r-mtime').textContent = records.marathonBestTime ? fmtRace(records.marathonBestTime) : '-';
 }
 
 export function setMuted(muted) {
@@ -101,7 +114,7 @@ export function setMuted(muted) {
 
 // ---------- HUD ----------
 export function updateHUD(game, records) {
-  set('h-dist', fmtKm(Math.min(game.meters, FINISH_M)));
+  set('h-dist', fmtKm(game.displayKm * 1000));
   set('h-time', fmtTime(game.t));
   set('h-pace', game.boostT > 0 ? 'ILLEGALE' : `${formatPace(game.pace)}/km`);
   set('h-score', fmtInt(game.score));
@@ -124,8 +137,28 @@ export function updateHUD(game, records) {
   if (spriteFiles[lv.variant]) set('h-variant', spriteFiles[lv.variant], 'src');
   set('f-brainrot', `${game.brainrot}%`, 'width');
 
-  const beating = game.score > records.bestScore && records.bestScore > 0;
-  set('h-pb', beating ? 'NUOVO PB!' : fmtInt(records.bestScore));
+  const best = game.marathon ? records.marathonBestScore : records.bestScore;
+  const beating = game.score > best && best > 0;
+  set('h-pb', beating ? 'NUOVO PB!' : fmtInt(best));
+
+  set('m-race', !game.marathon, 'hidden');
+  set('s-ghost', !game.marathon, 'hidden');
+  if (game.marathon) {
+    const info = game.stageInfo;
+    set('h-stage', `${Math.max(0, game.stage) + 1}/${MARATHON.stages.length} · ${info.name}`);
+    const gap = Math.round(game.ghostGap);
+    set('h-ghost', gap >= 0 ? `+${fmtInt(gap)} m` : `-${fmtInt(-gap)} m`);
+    set('f-race', `${(game.displayKm / MARATHON.km) * 100}%`, 'width');
+    set('g-mark', `${Math.min(100, (game.ghostMeters / game.finishM) * 100)}%`, 'left');
+    const st = Math.round(game.stomach);
+    set('t-stomach', game.crisisT > 0 ? 'CRISI INTESTINALE · PIÙ LENTO' : `STOMACO ${Math.min(100, st)}%`);
+    set('t-stomach', game.crisisT > 0 || st >= 70 ? 'tag tag-bad' : 'tag tag-warn', 'className');
+    set('t-stomach', st <= 0 && game.crisisT <= 0, 'hidden');
+    set('t-sprint', game.sprintT <= 0, 'hidden');
+  } else {
+    set('t-stomach', true, 'hidden');
+    set('t-sprint', true, 'hidden');
+  }
 
   set('t-combo', game.combo > 1 ? `COMBO KUDOS x${game.combo}` : '');
   set('t-combo', game.combo <= 1, 'hidden');
@@ -133,6 +166,19 @@ export function updateHUD(game, records) {
   set('t-mult', game.multT <= 0, 'hidden');
   set('t-boost', game.boostT <= 0, 'hidden');
   set('t-bonk', game.stamina > 0, 'hidden');
+  set('t-sand', game.sandT <= 0, 'hidden');
+  stationInfo(game);
+}
+
+// HYROX station banner (DOM, so it stays readable on phones): name, timer, instruction, result.
+function stationInfo(game) {
+  const st = game.inStation ? game.station : null;
+  set('station-info', !st, 'hidden');
+  if (!st) return;
+  const left = st.phase === 'active' ? Math.max(0, st.def.time - st.t) : st.phase === 'intro' ? st.def.time : 0;
+  set('si-title', `STAZIONE ${st.index + 1}/${STATIONS.length} · ${st.def.name} · ${left.toFixed(1)}s`);
+  const r = st.result;
+  set('si-text', st.phase === 'outro' ? (r.done ? `Completata! +${fmtInt(r.points)} punti` : `Tempo scaduto: +${fmtInt(r.points)} punti`) : st.def.hint);
 }
 
 // ---------- notifications: one message at a time, queued by priority ----------
@@ -194,7 +240,10 @@ function render(msg) {
 
 // Called every frame while playing. `imminent`: an obstacle is about to reach the runner,
 // so low-priority chatter waits (up to 1.5s) and the road stays readable.
-export function tickNotifications(dt, imminent) {
+// `held`: a HYROX station owns the banner area; messages wait (hidden, timers frozen) until it ends.
+export function tickNotifications(dt, imminent, held = false) {
+  $('callout').classList.toggle('held', held);
+  if (held) return;
   if (current) {
     current.remaining -= dt;
     const shown = current.duration - current.remaining;
@@ -231,6 +280,14 @@ export function levelUp({ level, title, rank, variant, quote }) {
   });
 }
 
+export function marathonUnlocked() {
+  notify({ kind: 'level', priority: 3, title: 'NUOVA MODALITÀ SBLOCCATA', text: 'MARATONA BRAINROT', quote: `${fmtInt(MARATHON.unlockScore)} punti. Ora corri i 42 km (simbolici).` });
+}
+
+export function stage({ index, total, name, intro }) {
+  notify({ kind: 'info', priority: 3, title: `TAPPA ${index + 1}/${total} · ${name}`, text: intro });
+}
+
 export function toast({ title, body }) {
   notify({ kind: 'feed', priority: 1, title, text: body });
 }
@@ -244,21 +301,37 @@ export function clearTransient() {
 }
 
 // ---------- results ----------
-export function showResults(result, records, isPB, message) {
-  $('over-title').textContent = result.finished ? '5K COMPLETATA' : 'FINE CORSA';
-  $('o-msg').textContent = message;
-  $('o-pb').hidden = !isPB;
+export function showResults(result, records, { isPB, newLegend, bestTime }, message) {
+  const marathon = result.course === 'marathon';
+  $('over-title').textContent = marathon
+    ? (result.finished ? 'MARATONA COMPLETATA' : `DNF AL KM ${Math.floor(result.km)}`)
+    : (result.finished ? '5K COMPLETATA' : 'FINE CORSA');
+  $('o-msg').textContent = newLegend ? `Titolo sbloccato: ${LEGEND_TITLE}. ${message}` : message;
+  $('o-pb').hidden = !isPB && !bestTime;
+  $('o-pb').textContent = bestTime && !isPB ? 'NUOVO MIGLIOR TEMPO!' : 'NUOVO PB!';
+  $('o-unlock').hidden = !result.unlocked;
+  $('btn-to-marathon').hidden = !result.unlocked;
+  const medal = marathon && result.finished && spriteFiles['medals/42k'];
+  $('o-medal').hidden = !medal;
+  if (medal) $('o-medal').src = spriteFiles['medals/42k'];
   const hour = new Date().getHours();
   const when = hour < 12 ? 'mattutina' : hour < 18 ? 'pomeridiana' : 'serale';
-  $('o-name').textContent = result.finished ? `Easy 5K ${when} (non easy)` : `Corsa ${when} (abbandonata)`;
+  $('o-name').textContent = marathon
+    ? (result.finished ? `Maratona Brainrot ${when} · medaglia al collo` : `Maratona ${when} (ritirata)`)
+    : (result.finished ? `Easy 5K ${when} (non easy)` : `Corsa ${when} (abbandonata)`);
   $('o-score').textContent = fmtInt(result.score);
-  $('o-dist').textContent = fmtKm(result.meters);
-  $('o-time').textContent = fmtTime(result.time);
+  $('o-dist').textContent = fmtKm(result.km * 1000);
+  $('o-time').textContent = marathon ? fmtRace(result.time) : fmtTime(result.time);
+  $('o-extra-label').textContent = marathon ? 'FANTASMA' : 'STAZIONI HYROX';
+  $('o-extra').textContent = marathon ? (result.ghostBeaten ? 'BATTUTO' : 'TI HA BATTUTO') : `${result.stations}/${result.stationsTotal}`;
+  $('o-best-label').textContent = marathon ? 'RECORD MARATONA' : 'RECORD PERSONALE';
   $('o-pace').textContent = result.meters > 50 ? `${formatPace(result.pace)}/km` : '-';
   $('o-kudos').textContent = String(result.kudos);
   $('o-shoes').textContent = String(result.shoes);
   $('o-level').textContent = `LV ${result.maxLevel} ${result.maxLevelRank} · ${result.maxLevelTitle}`;
   if (spriteFiles[result.maxLevelVariant]) $('o-variant').src = spriteFiles[result.maxLevelVariant];
-  $('o-best').textContent = fmtInt(records.bestScore);
+  $('o-best').textContent = marathon
+    ? `${fmtInt(records.marathonBestScore)}${records.marathonBestTime ? ` · ${fmtRace(records.marathonBestTime)}` : ''}`
+    : fmtInt(records.bestScore);
   showScreen('over');
 }
