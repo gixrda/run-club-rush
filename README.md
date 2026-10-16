@@ -38,15 +38,14 @@ Code map:
 
 ## Deploy
 
-Live: https://run-club-rush.pages.dev (Cloudflare Pages, project `run-club-rush`).
+Live: https://gixrda.github.io/run-club-rush/ (GitHub Pages). Every push to `main` runs
+`.github/workflows/pages.yml`: `npm ci`, `npm run check`, `npm run build` with `BASE_PATH=/run-club-rush/`,
+then publishes `dist/`. If the self-checks fail nothing is published and the previous version stays online.
 
-```bash
-npx wrangler@4 login   # once, approve in the browser
-npm run deploy         # self-checks, production build, upload of dist/ to Pages
-```
-
-`public/_headers` ships the security headers (strict same-origin CSP, no framing, HSTS, nosniff,
-no referrer). The game has no backend, no third-party scripts and no network calls besides its own assets.
+GitHub Pages cannot send response headers, so `vite.config.js` embeds the CSP (same-origin only, no inline
+scripts) and the no-referrer policy as `<meta>` tags in the production build. `public/_headers` carries the
+full header set (HSTS, no framing, ...) for hosts that support it, such as Cloudflare Pages.
+The game has no backend, no third-party scripts and no network calls besides its own assets.
 
 ## Assets
 
