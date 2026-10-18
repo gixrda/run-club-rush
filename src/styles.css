@@ -326,6 +326,8 @@ body {
 .records b { color: var(--lime); font-size: 15px; }
 .controls-hint { margin: 0; font-size: 13px; font-weight: 600; color: var(--cream); }
 .touch-hint { display: none; }
+.rotate-hint { display: none; margin: 0 0 10px; padding: 8px 12px; font-weight: 900; color: var(--ink); background: var(--orange); border: 3px solid var(--ink); border-radius: 12px; }
+@media (pointer: coarse) and (orientation: portrait) { .rotate-hint { display: block; } }
 .asset-warning { margin: 0; padding: 6px 10px; font-size: 13px; font-weight: 700; color: #fff; background: var(--red); border-radius: 8px; }
 .fineprint { margin: 12px 0 0; font-size: 11px; color: var(--muted); }
 
