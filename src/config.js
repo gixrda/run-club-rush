@@ -83,7 +83,7 @@ export const ARCADE = {
   first: 'park',
   middle: ['forest', 'beach', 'arena'],
   last: 'marathon',
-  stationsAt: [450, 1000, 1550, 2100, 2650, 3200, 3750, 4300], // one HYROX station each, in race order
+  stationsAt: [1500, 3500], // rare: random HYROX stations per run, kept in race order
 };
 
 // MARATONA BRAINROT: unlocked once a single arcade run reaches unlockScore points.

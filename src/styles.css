@@ -326,8 +326,10 @@ body {
 .records b { color: var(--lime); font-size: 15px; }
 .controls-hint { margin: 0; font-size: 13px; font-weight: 600; color: var(--cream); }
 .touch-hint { display: none; }
-.rotate-hint { display: none; margin: 0 0 10px; padding: 8px 12px; font-weight: 900; color: var(--ink); background: var(--orange); border: 3px solid var(--ink); border-radius: 12px; }
-@media (pointer: coarse) and (orientation: portrait) { .rotate-hint { display: block; } }
+.rotate-hint { display: none; align-items: center; justify-content: center; gap: 14px; margin: 0 0 10px; padding: 10px 12px; font-weight: 900; color: var(--ink); background: var(--orange); border: 3px solid var(--ink); border-radius: 12px; }
+.rotate-phone { flex: none; width: 24px; height: 40px; animation: rotate-phone 2.4s ease-in-out infinite; }
+@keyframes rotate-phone { 0%, 20% { transform: rotate(0); } 50%, 80% { transform: rotate(-90deg); } 100% { transform: rotate(0); } }
+@media (pointer: coarse) and (orientation: portrait) { .rotate-hint { display: flex; } }
 .asset-warning { margin: 0; padding: 6px 10px; font-size: 13px; font-weight: 700; color: #fff; background: var(--red); border-radius: 8px; }
 .fineprint { margin: 12px 0 0; font-size: 11px; color: var(--muted); }
 
@@ -466,6 +468,6 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero-runner { animation: none; }
+  .hero-runner, .rotate-phone { animation: none; }
   #callout, .screen, .fill, .progress-fill, .btn { transition: none; }
 }

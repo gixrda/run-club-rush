@@ -1,7 +1,7 @@
 // HYROX station visuals: equipment around the runner, the runner's pose, and the station panel.
 // The panel (meters only) sits under the DOM station banner, clear of the runner and the equipment.
-import { GROUND_Y, PLAYER_X, COLORS as C } from './config.js';
-import { STATIONS, STATION_TIMING, MECHANICS } from './stations.js';
+import { GROUND_Y, PLAYER_X, COLORS as C, ARCADE } from './config.js';
+import { STATION_TIMING, MECHANICS } from './stations.js';
 import { INK, text, outlined, fillPath, line } from './draw.js';
 
 const RUN = ['runner/run1', 'runner/run2', 'runner/run3', 'runner/run4'];
@@ -180,7 +180,7 @@ function stationSign(ctx, st) {
   ctx.fillStyle = '#5C6B8A';
   ctx.fillRect(x + 30, GROUND_Y - 72, 2.5, 72);
   outlined(ctx, INK, () => ctx.roundRect(x, GROUND_Y - 92, 64, 21, 4), 1);
-  text(ctx, `HYROX ${st.index + 1}/${STATIONS.length}`, x + 32, GROUND_Y - 86.5, C.lime, 6.5, { outline: null });
+  text(ctx, `HYROX ${st.n}/${ARCADE.stationsAt.length}`, x + 32, GROUND_Y - 86.5, C.lime, 6.5, { outline: null });
   text(ctx, st.def.name, x + 32, GROUND_Y - 77.5, C.cream, st.def.name.length > 12 ? 5 : 6.5, { outline: null });
 }
 

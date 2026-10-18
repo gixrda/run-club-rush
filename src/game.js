@@ -110,7 +110,8 @@ export class Game {
     this.mode = 'run';
     this.finishM = marathon ? MARATHON.finishM : ARCADE.finishM;
     this.zonePlan = marathon ? marathonPlan() : arcadePlan();
-    this.stationQueue = marathon ? [] : ARCADE.stationsAt.map((m, i) => ({ m, i }));
+    const picks = shuffle(STATIONS.map((_, i) => i)).slice(0, ARCADE.stationsAt.length).sort((a, b) => a - b);
+    this.stationQueue = marathon ? [] : ARCADE.stationsAt.map((m, k) => ({ m, i: picks[k], n: k + 1 }));
     this.station = null;
     this.stationsDone = 0;
     this.stage = -1; // marathon stage, announced on the first step
@@ -614,7 +615,7 @@ export class Game {
   // ---------- HYROX stations ----------
   spawnStation() {
     const q = this.stationQueue.shift();
-    this.station = Object.assign(createStation(q.i), { phase: 'approach', x: W + 40 });
+    this.station = Object.assign(createStation(q.i), { n: q.n, phase: 'approach', x: W + 40 });
     this.nextObstacleAt = Infinity; // nothing else until the station is over
   }
 
@@ -980,7 +981,7 @@ export class Game {
       kudos: this.kudos,
       shoes: this.shoes,
       stations: this.stationsDone,
-      stationsTotal: STATIONS.length,
+      stationsTotal: ARCADE.stationsAt.length,
       ghostBeaten,
       unlocked: this.unlockedNow,
       maxLevel: this.maxLevel,

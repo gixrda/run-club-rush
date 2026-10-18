@@ -1,6 +1,5 @@
-import { MARATHON, LEGEND_TITLE } from './config.js';
+import { MARATHON, LEGEND_TITLE, ARCADE } from './config.js';
 import { formatPace } from './game.js';
-import { STATIONS } from './stations.js';
 
 const $ = (id) => document.getElementById(id);
 const fmtInt = (n) => Math.floor(n).toLocaleString('it-IT');
@@ -176,7 +175,7 @@ function stationInfo(game) {
   set('station-info', !st, 'hidden');
   if (!st) return;
   const left = st.phase === 'active' ? Math.max(0, st.def.time - st.t) : st.phase === 'intro' ? st.def.time : 0;
-  set('si-title', `STAZIONE ${st.index + 1}/${STATIONS.length} · ${st.def.name} · ${left.toFixed(1)}s`);
+  set('si-title', `STAZIONE ${st.n}/${ARCADE.stationsAt.length} · ${st.def.name} · ${left.toFixed(1)}s`);
   const r = st.result;
   set('si-text', st.phase === 'outro' ? (r.done ? `Completata! +${fmtInt(r.points)} punti` : `Tempo scaduto: +${fmtInt(r.points)} punti`) : st.def.hint);
 }
