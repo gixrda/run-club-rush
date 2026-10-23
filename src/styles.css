@@ -425,10 +425,13 @@ body {
 }
 
 @media (pointer: coarse) and (orientation: landscape) {
-  /* landscape: buttons beside the stage */
-  :root { --pad-w: 88px; --pads-total: calc(2 * 88px + 2 * var(--gap)); --chrome: 40px; }
-  #play { grid-template-areas: 'jump stage slide'; grid-template-columns: var(--pad-w) auto var(--pad-w); width: auto; align-items: stretch; }
-  .pad { height: auto; min-height: 64px; }
+  /* landscape: the stage is height-bound, so every pixel of height goes to it.
+     No side pads: tapping the left/right half of the canvas jumps/slides (main.js). */
+  :root { --chrome: 18px; }
+  #app { padding: 4px 12px; gap: 6px; }
+  #play { grid-template-areas: 'stage'; grid-template-columns: auto; width: auto; }
+  .pad { display: none; }
+  #stage { box-shadow: none; }
 }
 
 @media (max-width: 560px) {
@@ -465,6 +468,40 @@ body {
   .marathon-card .start-arch { max-height: 18vh; }
   .marathon-card .screen-title { font-size: 26px; }
   .stages { font-size: 12px; padding: 6px 10px 6px 28px; }
+}
+
+/* phones in landscape: the free space is at the sides, so the HUD becomes a left column
+   and the stage takes the full height. The column gets whatever width the height-bound stage
+   leaves (min 156px), and fits more stat columns when it is wider. */
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 520px) {
+  :root {
+    --side: max(156px, calc(100vw - 24px - var(--gap) - (100dvh - var(--chrome)) * 16 / 9));
+    --stage-w: max(240px, calc(100vw - 24px - var(--side) - var(--gap)));
+  }
+  #app { flex-direction: row; gap: var(--gap); }
+  .hud {
+    flex: none;
+    width: var(--side);
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+    align-content: start;
+    gap: 4px 8px;
+    padding: 6px;
+    box-shadow: none;
+  }
+  .hud-row { display: contents; }
+  .value, #h-dist, #h-pace, #h-score, #h-kudos, #h-ghost, .stat-pb .value { min-width: 0; }
+  .meter, .hud-actions { grid-column: 1 / -1; order: 1; }
+  .hud-actions { order: 2; flex-wrap: wrap; gap: 4px; margin: 0; }
+  .hud-actions .btn { height: 26px; padding: 0 8px; font-size: 11px; }
+}
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 340px) {
+  /* very short (small phone + browser bars): 3 stat columns so the HUD fits the height */
+  :root { --side: max(224px, calc(100vw - 24px - var(--gap) - (100dvh - var(--chrome)) * 16 / 9)); }
+}
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 380px) {
+  /* the marathon HUD has two more rows (ghost, stage bar): same switch, a bit earlier */
+  :root:has(#m-race:not([hidden])) { --side: max(224px, calc(100vw - 24px - var(--gap) - (100dvh - var(--chrome)) * 16 / 9)); }
 }
 
 @media (prefers-reduced-motion: reduce) {

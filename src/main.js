@@ -69,6 +69,8 @@ function beginRun() {
 
 function start(which = course) {
   if (state === 'loading' || state === 'starting' || state === 'playing') return;
+  // Phones: full screen hides the browser bars (Android; iOS Safari ignores it).
+  if (matchMedia('(pointer: coarse)').matches && !document.fullscreenElement) document.documentElement.requestFullscreen?.()?.catch(() => {});
   if (which === 'marathon' && !store.marathonUnlocked) which = 'arcade';
   course = which;
   initAudio();
