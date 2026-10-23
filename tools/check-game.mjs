@@ -1,10 +1,10 @@
-// Headless self-check of the game rules (no browser): environments, the eight HYROX stations,
+// Headless self-check of the game rules (no browser): environments, the HYROX stations,
 // gel + collision joke, marathon unlock threshold, marathon stages, run-club archetypes, billboards.
 // Run: npm run check
 import { Game } from '../src/game.js';
 import { STATIONS, STATION_TIMING, createStation } from '../src/stations.js';
 import { BILLBOARDS, nextBillboard } from '../src/billboards.js';
-import { ZONES, OBSTACLES, MARATHON, JOKES, GUT, PLAYER_X, GROUND_Y, ARCHETYPES } from '../src/config.js';
+import { ZONES, OBSTACLES, MARATHON, ARCADE, JOKES, GUT, PLAYER_X, GROUND_Y, ARCHETYPES } from '../src/config.js';
 
 let failures = 0;
 function check(cond, msg) {
@@ -90,8 +90,10 @@ function play(g, { god = true, bot = true, maxT = 600 } = {}) {
   g.updateZone = (h, a) => { origUpdate(h, a); if (g.zone !== lastZone) { zoneTimes.push(g.t); lastZone = g.zone; } };
   const log = play(g);
   check(g.result?.finished, 'arcade run reaches the finish');
-  check(log.length === 8, `8 stations met (got ${log.length})`);
-  check(g.stationsDone === 8, `bot completes all 8 stations (got ${g.stationsDone})`);
+  const n = ARCADE.stationsAt.length;
+  check(log.length === n, `${n} stations met (got ${log.length})`);
+  check(g.stationsDone === n, `bot completes all ${n} stations (got ${g.stationsDone})`);
+  check(log.every((s, i) => s.st.n === i + 1 && (!i || s.st.index > log[i - 1].st.index)), 'stations numbered 1..n, in race order');
   const durations = [0, ...zoneTimes, g.t].map((t, i, a) => (i ? t - a[i - 1] : null)).slice(1);
   console.log(`arcade: ${g.t.toFixed(1)}s, score ${g.score}, zones ${ids.join(' > ')}`);
   console.log(`  zone durations (s): ${durations.map((d) => d.toFixed(1)).join(', ')}`);
